@@ -3,16 +3,17 @@ const bcrypt = require('bcryptjs');
 
 const jwt = require('jsonwebtoken');
 const router = express.Router();
-const { Pool } = require('pg');
 
 require('dotenv').config(); // This loads your .env variables
 
+
+const { Pool } = require('pg');
+
 const pool = new Pool({
-  user: process.env.DATABASE_USER,
-  host: process.env.DATABASE_HOST,
-  database: process.env.DATABASE_NAME,
-  password: process.env.DATABASE_PASSWORD,
-  port: process.env.DATABASE_PORT,
+  connectionString: process.env.DATABASE_URL, // You will set this environment variable in Render
+  ssl: {
+    rejectUnauthorized: false, // This is needed for cloud PostgreSQL instances
+  },
 });
 
 const JWT_SECRET = process.env.JWT_SECRET;
