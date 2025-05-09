@@ -5,11 +5,17 @@ const jwt = require('jsonwebtoken');
 const router = express.Router();
 const { Pool } = require('pg');
 
+require('dotenv').config(); // This loads your .env variables
+
 const pool = new Pool({
-  // your database configuration
+  user: process.env.DATABASE_USER,
+  host: process.env.DATABASE_HOST,
+  database: process.env.DATABASE_NAME,
+  password: process.env.DATABASE_PASSWORD,
+  port: process.env.DATABASE_PORT,
 });
 
-const JWT_SECRET = 'your_jwt_secret'; // Replace with your secret key
+const JWT_SECRET = process.env.JWT_SECRET;
 
 router.post('/register', async (req, res) => {
   const { username, password } = req.body;
