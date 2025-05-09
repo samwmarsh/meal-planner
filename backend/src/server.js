@@ -1,4 +1,5 @@
 const express = require('express');
+const cors = require('cors'); 
 const db = require('./db');
 const authRoutes = require('./auth');
 
@@ -6,6 +7,10 @@ const authRoutes = require('./auth');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+app.use(cors({
+  origin: 'https://meal-planner-1-lig0.onrender.com/',
+  credentials: true,
+}));
 app.use(express.json());
 
 app.get('/health', async (req, res) => {
