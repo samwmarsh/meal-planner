@@ -17,7 +17,6 @@ app.get('/health', async (req, res) => {
   }
 });
 
-app.use(express.json()); // Ensures JSON body parsing
 app.use('/auth', authRoutes); // Routes will be prefixed with /auth
 
 
