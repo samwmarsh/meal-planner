@@ -1,8 +1,11 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Link, Navigate } from 'react-router-dom';
+
 import Login from './components/Login';
 import Register from './components/Register';
 import MealCalendar from './components/MealCalendar';
+
+const isAuthenticated = () => !!localStorage.getItem('token');
 
 function App() {
   return (
@@ -11,14 +14,18 @@ function App() {
         <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h1>Meal Planner</h1>
           <nav>
-            <Link to="/login" style={{ marginRight: '1rem' }}>Login</Link>
-            <Link to="/register">Register</Link>
+            {!isAuthenticated() && (
+              <>
+                <Link to="/login" style={{ marginRight: '1rem' }}>Login</Link>
+                <Link to="/register">Register</Link>
+              </>
+            )}
           </nav>
         </header>
 
         <main style={{ marginTop: '2rem' }}>
           <Routes>
-            <Route path="/" element={<MealCalendar />} />
+            <Route path="/" element={isAuthenticated() ? <MealCalendar /> : <Navigate to="/login" />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
           </Routes>
