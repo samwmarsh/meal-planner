@@ -38,8 +38,9 @@ app.get('/meals', async (req, res) => {
 app.get('/meal-plans', authenticateToken, async (req, res) => {
   const { year, month } = req.query;
   const userId = req.user.id;
+  const lastDay = new Date(year, month, 0).getDate(); // month is 1-based here
   const start = `${year}-${month}-01`;
-  const end = `${year}-${month}-31`;
+  const end = `${year}-${month}-${String(lastDay).padStart(2, '0')}`;
   const { rows } = await db.query(
     'SELECT * FROM meal_plans WHERE user_id = $1 AND date BETWEEN $2 AND $3',
     [userId, start, end]
