@@ -2,7 +2,7 @@ const express = require('express');
 const cors = require('cors'); 
 const db = require('./db');
 const authRoutes = require('./auth');
-const authenticateToken = require('./middleware/auth');
+const { authenticateToken } = require('./middleware/auth');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
