@@ -20,7 +20,7 @@ const Register = () => {
         await response.text(); // optionally log or show it
         window.location.href = '/login'; // Go to login page after registration
     } else {
-        setError('Registration failed');
+        setError('Registration failed, this username may already exist');
     }
     };
 
