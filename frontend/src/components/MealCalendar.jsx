@@ -28,7 +28,7 @@ const MealCalendar = () => {
   const [editingDay, setEditingDay] = useState(null);
 
   useEffect(() => {
-    axios.get('/meals').then(res => {
+    axios.get(`${import.meta.env.VITE_API_URL}/meals`).then(res => {
       const grouped = { Breakfast: [], Lunch: [], Dinner: [], Snacks: [] };
       res.data.forEach(meal => {
         if (grouped[meal.type]) grouped[meal.type].push(meal.name);
