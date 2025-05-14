@@ -13,8 +13,8 @@ function getFirstDayOfWeek(year, month) {
 
 const MealCalendar = () => {
   const today = new Date();
-  const year = today.getFullYear();
-  const month = today.getMonth();
+  const [year, setYear] = useState(today.getFullYear());
+  const [month, setMonth] = useState(today.getMonth());
   const daysInMonth = getDaysInMonth(year, month);
   const firstDayOfWeek = getFirstDayOfWeek(year, month);
 
@@ -27,6 +27,26 @@ const MealCalendar = () => {
   });
   const [editingDay, setEditingDay] = useState(null);
 
+  const goToPrevMonth = () => {
+    setMonth(prev => {
+      if (prev === 0) {
+        setYear(y => y - 1);
+        return 11;
+      }
+      return prev - 1;
+    });
+  };
+
+  const goToNextMonth = () => {
+    setMonth(prev => {
+      if (prev === 11) {
+        setYear(y => y + 1);
+        return 0;
+      }
+      return prev + 1;
+    });
+  };
+
   useEffect(() => {
     axios.get(`${import.meta.env.VITE_API_URL}/meals`).then(res => {
       const grouped = { Breakfast: [], Lunch: [], Dinner: [], Snacks: [] };
@@ -37,6 +57,27 @@ const MealCalendar = () => {
     });
   }, []);
 
+  useEffect(() => {
+    // Replace with your actual user ID logic
+    const userId = localStorage.getItem('userId');
+    const token = localStorage.getItem('token');
+    axios
+      .get(`${import.meta.env.VITE_API_URL}/meal-plans`, {
+        headers: { Authorization: `Bearer ${token}` },
+        params: { userId, year, month: String(month + 1).padStart(2, '0') }
+      })
+      .then(res => {
+        // Transform backend data into the { [dateKey]: { [type]: mealName } } format
+        const loadedMeals = {};
+        res.data.forEach(plan => {
+          const dateKey = plan.date;
+          if (!loadedMeals[dateKey]) loadedMeals[dateKey] = {};
+          loadedMeals[dateKey][plan.meal_type] = plan.meal_name;
+        });
+        setMeals(loadedMeals);
+      });
+  }, [year, month]);
+
   const handleMealChange = (dateKey, type, value) => {
     setMeals(prev => ({
       ...prev,
@@ -45,6 +86,15 @@ const MealCalendar = () => {
         [type]: value,
       },
     }));
+
+    // Save to backend
+    const userId = localStorage.getItem('userId');
+    const token = localStorage.getItem('token');
+    axios.post(
+      `${import.meta.env.VITE_API_URL}/meal-plans`,
+      { date: dateKey, meal_type: type, meal_name: value },
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
   };
 
   // Build days array with blanks for first week
@@ -54,9 +104,13 @@ const MealCalendar = () => {
 
   return (
     <div>
-      <h2>
-        {today.toLocaleString('default', { month: 'long' })} {year}
-      </h2>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+        <button onClick={goToPrevMonth}>&lt; Prev</button>
+        <h2>
+          {new Date(year, month).toLocaleString('default', { month: 'long' })} {year}
+        </h2>
+        <button onClick={goToNextMonth}>Next &gt;</button>
+      </div>
       <div
         style={{
           display: 'grid',
@@ -136,7 +190,7 @@ const MealCalendar = () => {
                       </label>
                     </div>
                   ))}
-                  <button onClick={() => setEditingDay(null)} style={{ marginTop: 8 }}>Close</button>
+                  <button onClick={() => setEditingDay(null)} style={{ marginTop: 8 }}>Save</button>
                 </div>
               )}
             </div>
