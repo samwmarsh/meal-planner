@@ -22,6 +22,18 @@ app.get('/health', async (req, res) => {
   }
 });
 
+app.get('/meals', async (req, res) => {
+  const { type } = req.query;
+  let query = 'SELECT * FROM meals';
+  let params = [];
+  if (type) {
+    query += ' WHERE type = $1';
+    params.push(type);
+  }
+  const { rows } = await db.query(query, params);
+  res.json(rows);
+});
+
 app.use('/auth', authRoutes); // Routes will be prefixed with /auth
 
 
