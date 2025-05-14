@@ -53,10 +53,10 @@ app.post('/meal-plans', authenticateToken, async (req, res) => {
   const userId = req.user.id;
   const { date, meal_type, meal_name } = req.body;
   await db.query(
-    `INSERT INTO meal_plans (user_id, date, meal_type, meal_name)
-     VALUES ($1, $2, $3, $4)
+    `INSERT INTO meal_plans (user_id, date, meal_type, meal_name, last_updated)
+     VALUES ($1, $2, $3, $4, NOW())
      ON CONFLICT (user_id, date, meal_type)
-     DO UPDATE SET meal_name = EXCLUDED.meal_name`,
+     DO UPDATE SET meal_name = EXCLUDED.meal_name, last_updated = NOW()`,
     [userId, date, meal_type, meal_name]
   );
   res.json({ success: true });

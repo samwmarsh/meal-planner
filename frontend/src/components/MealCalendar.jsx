@@ -68,7 +68,8 @@ const MealCalendar = () => {
       .then(res => {
         const loadedMeals = {};
         res.data.forEach(plan => {
-          const dateKey = plan.date;
+          // Normalize date to YYYY-MM-DD
+          const dateKey = plan.date.slice(0, 10);
           if (!loadedMeals[dateKey]) loadedMeals[dateKey] = {};
           loadedMeals[dateKey][plan.meal_type] = plan.meal_name;
         });
