@@ -13,4 +13,13 @@ function authenticateToken(req, res, next) {
   });
 }
 
-module.exports = authenticateToken;
+function generateToken(user) {
+  const token = jwt.sign(
+    { id: user.id, email: user.email }, // <-- include id!
+    SECRET,
+    { expiresIn: '7d' }
+  );
+  return token;
+}
+
+module.exports = { authenticateToken, generateToken };
