@@ -57,17 +57,15 @@ const MealCalendar = () => {
     });
   }, []);
 
+  // Fetch meal plans
   useEffect(() => {
-    // Replace with your actual user ID logic
-    const userId = localStorage.getItem('userId');
     const token = localStorage.getItem('token');
     axios
       .get(`${import.meta.env.VITE_API_URL}/meal-plans`, {
         headers: { Authorization: `Bearer ${token}` },
-        params: { userId, year, month: String(month + 1).padStart(2, '0') }
+        params: { year, month: String(month + 1).padStart(2, '0') }
       })
       .then(res => {
-        // Transform backend data into the { [dateKey]: { [type]: mealName } } format
         const loadedMeals = {};
         res.data.forEach(plan => {
           const dateKey = plan.date;
@@ -78,6 +76,7 @@ const MealCalendar = () => {
       });
   }, [year, month]);
 
+  // Save meal plan
   const handleMealChange = (dateKey, type, value) => {
     setMeals(prev => ({
       ...prev,
@@ -87,8 +86,6 @@ const MealCalendar = () => {
       },
     }));
 
-    // Save to backend
-    const userId = localStorage.getItem('userId');
     const token = localStorage.getItem('token');
     axios.post(
       `${import.meta.env.VITE_API_URL}/meal-plans`,
@@ -125,7 +122,7 @@ const MealCalendar = () => {
           <div key={d} style={{ fontWeight: 'bold', textAlign: 'center' }}>{d}</div>
         ))}
         {days.map((day, idx) => {
-          if (!day) return <div key={idx} />;
+          if (!day) return <div key={`blank-${idx}`} />;
           const dateKey = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
           return (
             <div
