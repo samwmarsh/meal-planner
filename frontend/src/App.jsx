@@ -1,36 +1,24 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Link, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 
 import Login from './components/Login';
 import Register from './components/Register';
 import MealCalendar from './components/MealCalendar';
+import Header from './components/Header'; // <-- import your Header
 
 const isAuthenticated = () => !!localStorage.getItem('token');
 
 function App() {
   return (
     <Router>
-      <div style={{ padding: '1rem', fontFamily: 'sans-serif' }}>
-        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h1>Meal Planner</h1>
-          <nav>
-            {!isAuthenticated() && (
-              <>
-                <Link to="/login" style={{ marginRight: '1rem' }}>Login</Link>
-                <Link to="/register">Register</Link>
-              </>
-            )}
-          </nav>
-        </header>
-
-        <main style={{ marginTop: '2rem' }}>
-          <Routes>
-            <Route path="/" element={isAuthenticated() ? <MealCalendar /> : <Navigate to="/login" />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<Register />} />
-          </Routes>
-        </main>
-      </div>
+      <Header /> {/* <-- use your Header here */}
+      <main style={{ marginTop: '2rem', padding: '1rem', fontFamily: 'sans-serif' }}>
+        <Routes>
+          <Route path="/" element={isAuthenticated() ? <MealCalendar /> : <Navigate to="/login" />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+        </Routes>
+      </main>
     </Router>
   );
 }
