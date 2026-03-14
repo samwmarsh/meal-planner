@@ -1,45 +1,25 @@
-:root {
-  --primary-bg: #f7fafc;
-  --primary-color: #2d3748;
-  --accent: #3182ce;
-  --accent-light: #63b3ed;
-  --card-bg: #fff;
-  --border-radius: 8px;
-  --shadow: 0 2px 8px rgba(0,0,0,0.06);
-  --font-family: 'Segoe UI', 'Roboto', 'Arial', sans-serif;
-}
+@import "tailwindcss";
 
-body {
-  background: var(--primary-bg);
-  color: var(--primary-color);
-  font-family: var(--font-family);
-  margin: 0;
-  padding: 0;
-}
-
-h1, h2, h3 {
-  color: var(--accent);
-}
-
-.fc { /* FullCalendar root */
-  background: var(--card-bg);
-  border-radius: var(--border-radius);
-  box-shadow: var(--shadow);
+/* FullCalendar overrides */
+.fc {
+  background: #fff;
+  border-radius: 0.5rem;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
   padding: 1rem;
 }
 
 .fc-toolbar-title {
-  color: var(--primary-color);
+  color: #334155;
 }
 
 .fc-button {
-  background: var(--accent);
+  background: #2563eb;
   color: #fff;
   border: none;
-  border-radius: var(--border-radius);
+  border-radius: 0.5rem;
   transition: background 0.2s;
 }
 
 .fc-button:hover {
-  background: var(--accent-light);
+  background: #3b82f6;
 }

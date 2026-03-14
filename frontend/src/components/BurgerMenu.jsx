@@ -1,40 +1,54 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 
 const BurgerMenu = () => {
   const [open, setOpen] = useState(false);
+  const menuRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (menuRef.current && !menuRef.current.contains(e.target)) {
+        setOpen(false);
+      }
+    };
+    if (open) document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [open]);
 
   return (
-    <div style={{ position: 'relative', display: 'inline-block' }}>
+    <div className="relative" ref={menuRef}>
       <button
         aria-label="Open navigation"
         onClick={() => setOpen(!open)}
-        style={{
-          background: 'none',
-          border: 'none',
-          fontSize: '2rem',
-          cursor: 'pointer',
-          color: 'var(--accent)',
-        }}
+        className="flex flex-col justify-center items-center w-8 h-8 gap-1.5 rounded-md hover:bg-slate-100 transition-colors"
       >
-        &#9776;
+        <span className="block w-5 h-0.5 bg-slate-600 rounded"></span>
+        <span className="block w-5 h-0.5 bg-slate-600 rounded"></span>
+        <span className="block w-5 h-0.5 bg-slate-600 rounded"></span>
       </button>
       {open && (
-        <div
-          style={{
-            position: 'absolute',
-            top: '2.5rem',
-            left: 0,
-            background: 'var(--card-bg)',
-            boxShadow: 'var(--shadow)',
-            borderRadius: 'var(--border-radius)',
-            padding: '1rem',
-            zIndex: 1000,
-          }}
-        >
-          <Link to="/" onClick={() => setOpen(false)}>Home</Link><br />
-          <Link to="/profile" onClick={() => setOpen(false)}>Profile</Link><br />
-          {/* Add more links as needed */}
+        <div className="absolute top-10 left-0 bg-white rounded-xl shadow-md border border-slate-100 py-2 min-w-40 z-50">
+          <Link
+            to="/"
+            onClick={() => setOpen(false)}
+            className="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 hover:text-blue-600 transition-colors"
+          >
+            Home
+          </Link>
+          <Link
+            to="/shopping-list"
+            onClick={() => setOpen(false)}
+            className="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 hover:text-blue-600 transition-colors"
+          >
+            Shopping List
+          </Link>
+          <Link
+            to="/profile"
+            onClick={() => setOpen(false)}
+            className="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 hover:text-blue-600 transition-colors"
+          >
+            Profile &amp; Goals
+          </Link>
         </div>
       )}
     </div>

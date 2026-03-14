@@ -1,74 +1,42 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
-
 const jwt = require('jsonwebtoken');
+const db = require('./db');
+
 const router = express.Router();
-
-require('dotenv').config(); // This loads your .env variables
-
-
-const { Pool } = require('pg');
-
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL, // You will set this environment variable in Render
-  ssl: {
-    rejectUnauthorized: false, // This is needed for cloud PostgreSQL instances
-  },
-});
-
 const JWT_SECRET = process.env.JWT_SECRET;
 
 router.post('/register', async (req, res) => {
   const { username, password } = req.body;
-  const client = await pool.connect();
   try {
     const hashedPassword = await bcrypt.hash(password, 10);
-    await client.query(
+    await db.query(
       'INSERT INTO users (username, password_hash) VALUES ($1, $2)',
       [username, hashedPassword]
     );
     res.status(201).send('User registered');
   } catch (err) {
     res.status(500).send('Error registering user');
-  } finally {
-    client.release();
   }
 });
 
-
 router.post('/login', async (req, res) => {
   const { username, password } = req.body;
-  const client = await pool.connect();
   try {
-    const result = await client.query(
+    const result = await db.query(
       'SELECT * FROM users WHERE username = $1',
       [username]
     );
     const user = result.rows[0];
     if (user && await bcrypt.compare(password, user.password_hash)) {
-      const token = jwt.sign({ id: user.id }, JWT_SECRET, { expiresIn: '1h' });
+      const token = jwt.sign({ id: user.id }, JWT_SECRET, { expiresIn: '7d' });
       res.json({ token });
     } else {
       res.status(401).send('Invalid credentials');
     }
   } catch (err) {
     res.status(500).send('Error logging in');
-  } finally {
-    client.release();
   }
 });
-
-
-function authenticateToken(req, res, next) {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
-  if (!token) return res.sendStatus(401);
-
-  jwt.verify(token, JWT_SECRET, (err, user) => {
-    if (err) return res.sendStatus(403);
-    req.user = user;
-    next();
-  });
-}
 
 module.exports = router;

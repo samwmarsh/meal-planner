@@ -1,0 +1,376 @@
+[
+  {
+    "title": "High Protein Chicken & Rice Bowl",
+    "description": "A classic meal prep staple. Lean chicken breast with fluffy rice and steamed broccoli — simple, filling, and hits your macros every time.",
+    "category": "Dinner",
+    "servings": 4,
+    "prep_time_mins": 15,
+    "cook_time_mins": 30,
+    "dietary_tags": ["gluten-free", "dairy-free"],
+    "calories_per_serving": 520,
+    "protein_per_serving": 48,
+    "carbs_per_serving": 55,
+    "fat_per_serving": 10,
+    "status": "community",
+    "ingredients": [
+      { "section": "Main", "position": 1, "quantity": 800, "unit": "g", "name": "chicken breast", "notes": "approximately 4 medium breasts" },
+      { "section": "Main", "position": 2, "quantity": 300, "unit": "g", "name": "long grain white rice", "notes": "dry weight" },
+      { "section": "Main", "position": 3, "quantity": 400, "unit": "g", "name": "broccoli", "notes": "cut into florets" },
+      { "section": "Main", "position": 4, "quantity": 2, "unit": "tbsp", "name": "olive oil" },
+      { "section": "Main", "position": 5, "quantity": 1, "unit": "tsp", "name": "garlic powder" },
+      { "section": "Main", "position": 6, "quantity": 1, "unit": "tsp", "name": "paprika" },
+      { "section": "Main", "position": 7, "quantity": 1, "unit": "tsp", "name": "salt" },
+      { "section": "Main", "position": 8, "quantity": 0.5, "unit": "tsp", "name": "black pepper" }
+    ],
+    "steps": [
+      { "section": "Prep", "position": 1, "instruction": "Preheat oven to 200°C (180°C fan). Cook the rice according to package instructions." },
+      { "section": "Chicken", "position": 2, "instruction": "Rub the chicken breasts with 1 tbsp olive oil, garlic powder, paprika, salt and pepper." },
+      { "section": "Chicken", "position": 3, "instruction": "Place chicken on a baking tray and roast for 25–30 minutes until cooked through (internal temp 75°C). Rest for 5 minutes then slice." },
+      { "section": "Broccoli", "position": 4, "instruction": "Toss broccoli florets in remaining 1 tbsp olive oil and a pinch of salt. Roast alongside chicken for the last 15 minutes, or steam for 5–6 minutes." },
+      { "section": "Assemble", "position": 5, "instruction": "Divide rice equally into 4 meal prep containers. Top each with sliced chicken and broccoli. Refrigerate for up to 4 days." }
+    ]
+  },
+  {
+    "title": "Overnight Oats",
+    "description": "Prep the night before and grab straight from the fridge. Creamy, filling, and packed with protein from Greek yogurt — endlessly customisable with your favourite toppings.",
+    "category": "Breakfast",
+    "servings": 1,
+    "prep_time_mins": 5,
+    "cook_time_mins": 0,
+    "dietary_tags": ["vegetarian", "gluten-free"],
+    "calories_per_serving": 390,
+    "protein_per_serving": 22,
+    "carbs_per_serving": 58,
+    "fat_per_serving": 9,
+    "status": "community",
+    "ingredients": [
+      { "section": "Base", "position": 1, "quantity": 80, "unit": "g", "name": "rolled oats" },
+      { "section": "Base", "position": 2, "quantity": 150, "unit": "g", "name": "Greek yogurt", "notes": "full-fat or low-fat both work" },
+      { "section": "Base", "position": 3, "quantity": 150, "unit": "ml", "name": "semi-skimmed milk" },
+      { "section": "Base", "position": 4, "quantity": 1, "unit": "tbsp", "name": "chia seeds" },
+      { "section": "Base", "position": 5, "quantity": 1, "unit": "tbsp", "name": "honey" },
+      { "section": "Toppings", "position": 6, "quantity": 100, "unit": "g", "name": "mixed berries", "notes": "fresh or frozen" }
+    ],
+    "steps": [
+      { "section": "Mix", "position": 1, "instruction": "Combine oats, Greek yogurt, milk, chia seeds and honey in a jar or container. Stir well." },
+      { "section": "Mix", "position": 2, "instruction": "Seal and refrigerate overnight (or at least 4 hours)." },
+      { "section": "Serve", "position": 3, "instruction": "In the morning, give it a stir. Add a splash more milk if too thick. Top with berries and serve cold." }
+    ]
+  },
+  {
+    "title": "Turkey Meatball Pasta",
+    "description": "Lean turkey meatballs in a rich tomato sauce with pasta. Makes 4 generous portions — great for batch cooking and reheats perfectly.",
+    "category": "Dinner",
+    "servings": 4,
+    "prep_time_mins": 20,
+    "cook_time_mins": 30,
+    "dietary_tags": ["dairy-free"],
+    "calories_per_serving": 545,
+    "protein_per_serving": 42,
+    "carbs_per_serving": 65,
+    "fat_per_serving": 11,
+    "status": "community",
+    "ingredients": [
+      { "section": "Meatballs", "position": 1, "quantity": 500, "unit": "g", "name": "turkey mince", "notes": "5% fat" },
+      { "section": "Meatballs", "position": 2, "quantity": 1, "unit": "", "name": "egg" },
+      { "section": "Meatballs", "position": 3, "quantity": 40, "unit": "g", "name": "breadcrumbs" },
+      { "section": "Meatballs", "position": 4, "quantity": 2, "unit": "cloves", "name": "garlic", "notes": "minced" },
+      { "section": "Meatballs", "position": 5, "quantity": 1, "unit": "tsp", "name": "dried oregano" },
+      { "section": "Meatballs", "position": 6, "quantity": 0.5, "unit": "tsp", "name": "salt" },
+      { "section": "Sauce", "position": 7, "quantity": 700, "unit": "g", "name": "passata" },
+      { "section": "Sauce", "position": 8, "quantity": 1, "unit": "", "name": "onion", "notes": "finely diced" },
+      { "section": "Sauce", "position": 9, "quantity": 1, "unit": "tsp", "name": "dried basil" },
+      { "section": "Pasta", "position": 10, "quantity": 400, "unit": "g", "name": "penne pasta", "notes": "dry weight" }
+    ],
+    "steps": [
+      { "section": "Meatballs", "position": 1, "instruction": "Mix turkey mince, egg, breadcrumbs, garlic, oregano and salt together. Roll into 20 equal balls (approx 35g each)." },
+      { "section": "Meatballs", "position": 2, "instruction": "Fry meatballs in a little oil over medium-high heat for 5–6 minutes, turning until browned all over. Set aside." },
+      { "section": "Sauce", "position": 3, "instruction": "In the same pan, soften diced onion for 5 minutes. Add passata and basil, season well." },
+      { "section": "Sauce", "position": 4, "instruction": "Return meatballs to the sauce. Simmer on low for 15–20 minutes until cooked through." },
+      { "section": "Pasta", "position": 5, "instruction": "Cook pasta in heavily salted boiling water according to package instructions. Drain, reserving a cup of pasta water." },
+      { "section": "Assemble", "position": 6, "instruction": "Toss pasta with sauce, adding pasta water to loosen if needed. Divide into 4 portions." }
+    ]
+  },
+  {
+    "title": "Egg & Veggie Muffins",
+    "description": "Portable, protein-packed egg muffins you can bake on Sunday and grab all week. Endlessly adaptable — swap in whatever veg you have.",
+    "category": "Breakfast",
+    "servings": 4,
+    "prep_time_mins": 10,
+    "cook_time_mins": 20,
+    "dietary_tags": ["vegetarian", "gluten-free", "pcos-friendly"],
+    "calories_per_serving": 210,
+    "protein_per_serving": 18,
+    "carbs_per_serving": 4,
+    "fat_per_serving": 14,
+    "status": "community",
+    "ingredients": [
+      { "section": "Main", "position": 1, "quantity": 8, "unit": "", "name": "eggs", "notes": "medium" },
+      { "section": "Main", "position": 2, "quantity": 1, "unit": "", "name": "red pepper", "notes": "finely diced" },
+      { "section": "Main", "position": 3, "quantity": 100, "unit": "g", "name": "baby spinach", "notes": "roughly chopped" },
+      { "section": "Main", "position": 4, "quantity": 60, "unit": "g", "name": "cheddar cheese", "notes": "grated" },
+      { "section": "Main", "position": 5, "quantity": 0.5, "unit": "tsp", "name": "salt" },
+      { "section": "Main", "position": 6, "quantity": 0.5, "unit": "tsp", "name": "black pepper" },
+      { "section": "Main", "position": 7, "quantity": 1, "unit": "tsp", "name": "mixed herbs" }
+    ],
+    "steps": [
+      { "section": "Prep", "position": 1, "instruction": "Preheat oven to 180°C (160°C fan). Grease a 12-hole muffin tin well." },
+      { "section": "Mix", "position": 2, "instruction": "Whisk all 8 eggs together with salt, pepper and herbs." },
+      { "section": "Mix", "position": 3, "instruction": "Stir in diced pepper, spinach and half the cheese (30g)." },
+      { "section": "Bake", "position": 4, "instruction": "Pour mixture evenly into 12 muffin holes. Top each with remaining cheese (30g total)." },
+      { "section": "Bake", "position": 5, "instruction": "Bake for 18–20 minutes until set and lightly golden. Cool slightly before removing. Refrigerate for up to 5 days. Serve 3 per portion." }
+    ]
+  },
+  {
+    "title": "Salmon Teriyaki with Rice & Broccoli",
+    "description": "A simple teriyaki glaze turns salmon fillets into something special. Ready in 25 minutes and works brilliantly for meal prep.",
+    "category": "Dinner",
+    "servings": 2,
+    "prep_time_mins": 10,
+    "cook_time_mins": 20,
+    "dietary_tags": ["dairy-free", "gluten-free"],
+    "calories_per_serving": 580,
+    "protein_per_serving": 42,
+    "carbs_per_serving": 62,
+    "fat_per_serving": 16,
+    "status": "community",
+    "ingredients": [
+      { "section": "Salmon", "position": 1, "quantity": 2, "unit": "", "name": "salmon fillets", "notes": "approx 150g each, skin on" },
+      { "section": "Teriyaki Sauce", "position": 2, "quantity": 3, "unit": "tbsp", "name": "soy sauce" },
+      { "section": "Teriyaki Sauce", "position": 3, "quantity": 1, "unit": "tbsp", "name": "honey" },
+      { "section": "Teriyaki Sauce", "position": 4, "quantity": 1, "unit": "tsp", "name": "sesame oil" },
+      { "section": "Teriyaki Sauce", "position": 5, "quantity": 1, "unit": "tsp", "name": "fresh ginger", "notes": "grated" },
+      { "section": "Teriyaki Sauce", "position": 6, "quantity": 1, "unit": "clove", "name": "garlic", "notes": "minced" },
+      { "section": "Sides", "position": 7, "quantity": 200, "unit": "g", "name": "jasmine rice", "notes": "dry weight" },
+      { "section": "Sides", "position": 8, "quantity": 300, "unit": "g", "name": "broccoli", "notes": "florets" }
+    ],
+    "steps": [
+      { "section": "Sauce", "position": 1, "instruction": "Mix soy sauce, honey, sesame oil, ginger and garlic to make teriyaki sauce." },
+      { "section": "Rice", "position": 2, "instruction": "Cook rice according to package instructions." },
+      { "section": "Salmon", "position": 3, "instruction": "Place salmon skin-side down in a cold non-stick pan. Turn heat to medium-high. Cook 4 minutes without moving." },
+      { "section": "Salmon", "position": 4, "instruction": "Flip salmon. Pour teriyaki sauce over. Cook a further 3–4 minutes, spooning sauce over the fish. The sauce will reduce and glaze." },
+      { "section": "Broccoli", "position": 5, "instruction": "Steam broccoli for 4–5 minutes until tender but still with bite." },
+      { "section": "Serve", "position": 6, "instruction": "Plate rice, top with salmon and broccoli. Drizzle any remaining sauce from the pan over the top." }
+    ]
+  },
+  {
+    "title": "Greek Chicken Quinoa Bowl",
+    "description": "Juicy baked chicken thighs on a bed of fluffy quinoa with fresh cucumber, tomatoes, olives and feta. Meal preps beautifully for 4 days.",
+    "category": "Lunch",
+    "servings": 4,
+    "prep_time_mins": 15,
+    "cook_time_mins": 35,
+    "dietary_tags": ["gluten-free"],
+    "calories_per_serving": 510,
+    "protein_per_serving": 42,
+    "carbs_per_serving": 40,
+    "fat_per_serving": 18,
+    "status": "community",
+    "ingredients": [
+      { "section": "Chicken", "position": 1, "quantity": 600, "unit": "g", "name": "boneless chicken thighs", "notes": "skin removed" },
+      { "section": "Chicken", "position": 2, "quantity": 2, "unit": "tbsp", "name": "olive oil" },
+      { "section": "Chicken", "position": 3, "quantity": 1, "unit": "tsp", "name": "dried oregano" },
+      { "section": "Chicken", "position": 4, "quantity": 1, "unit": "tsp", "name": "garlic powder" },
+      { "section": "Chicken", "position": 5, "quantity": 1, "unit": "", "name": "lemon", "notes": "juice and zest" },
+      { "section": "Quinoa", "position": 6, "quantity": 250, "unit": "g", "name": "quinoa", "notes": "dry weight, rinsed" },
+      { "section": "Salad", "position": 7, "quantity": 1, "unit": "", "name": "cucumber", "notes": "diced" },
+      { "section": "Salad", "position": 8, "quantity": 200, "unit": "g", "name": "cherry tomatoes", "notes": "halved" },
+      { "section": "Salad", "position": 9, "quantity": 100, "unit": "g", "name": "feta cheese", "notes": "crumbled" },
+      { "section": "Salad", "position": 10, "quantity": 60, "unit": "g", "name": "kalamata olives", "notes": "pitted, halved" }
+    ],
+    "steps": [
+      { "section": "Chicken", "position": 1, "instruction": "Marinate chicken thighs in olive oil, oregano, garlic powder, lemon juice and zest for at least 10 minutes (or overnight)." },
+      { "section": "Chicken", "position": 2, "instruction": "Roast at 200°C (180°C fan) for 30–35 minutes until golden and cooked through. Rest 5 minutes, then slice." },
+      { "section": "Quinoa", "position": 3, "instruction": "Cook quinoa in 500ml salted water. Bring to boil, reduce heat, cover and simmer 12–15 minutes until water is absorbed. Fluff with a fork." },
+      { "section": "Assemble", "position": 4, "instruction": "Divide quinoa into 4 containers. Top with sliced chicken, cucumber, tomatoes, feta and olives. Store dressing separately if meal prepping." }
+    ]
+  },
+  {
+    "title": "Protein Pancakes",
+    "description": "Fluffy, golden pancakes packed with protein. Made with oats, eggs and a banana — no protein powder required, though you can add a scoop for extra.",
+    "category": "Breakfast",
+    "servings": 2,
+    "prep_time_mins": 5,
+    "cook_time_mins": 15,
+    "dietary_tags": ["vegetarian", "gluten-free"],
+    "calories_per_serving": 370,
+    "protein_per_serving": 24,
+    "carbs_per_serving": 45,
+    "fat_per_serving": 9,
+    "status": "community",
+    "ingredients": [
+      { "section": "Batter", "position": 1, "quantity": 3, "unit": "", "name": "eggs", "notes": "medium" },
+      { "section": "Batter", "position": 2, "quantity": 1, "unit": "", "name": "ripe banana", "notes": "mashed" },
+      { "section": "Batter", "position": 3, "quantity": 80, "unit": "g", "name": "rolled oats", "notes": "blended to a flour" },
+      { "section": "Batter", "position": 4, "quantity": 100, "unit": "ml", "name": "semi-skimmed milk" },
+      { "section": "Batter", "position": 5, "quantity": 0.5, "unit": "tsp", "name": "baking powder" },
+      { "section": "Batter", "position": 6, "quantity": 1, "unit": "tsp", "name": "vanilla extract" },
+      { "section": "Optional", "position": 7, "quantity": 30, "unit": "g", "name": "whey protein powder", "notes": "vanilla, optional — adds ~12g extra protein" }
+    ],
+    "steps": [
+      { "section": "Batter", "position": 1, "instruction": "Blend oats to a fine flour in a blender or food processor." },
+      { "section": "Batter", "position": 2, "instruction": "Add all remaining ingredients and blend until smooth. Rest 2 minutes." },
+      { "section": "Cook", "position": 3, "instruction": "Heat a non-stick pan over medium heat. Spray with cooking oil." },
+      { "section": "Cook", "position": 4, "instruction": "Pour in small rounds of batter (about 3 tbsp each). Cook until bubbles form on the surface, 2–3 minutes. Flip and cook 1–2 minutes more." },
+      { "section": "Serve", "position": 5, "instruction": "Makes approximately 8 small pancakes. Serve 4 per person with Greek yogurt and berries." }
+    ]
+  },
+  {
+    "title": "Beef & Broccoli Stir Fry",
+    "description": "Tender sliced beef and crisp broccoli in a savoury, glossy sauce. On the table in 20 minutes and better than a takeaway.",
+    "category": "Dinner",
+    "servings": 3,
+    "prep_time_mins": 15,
+    "cook_time_mins": 15,
+    "dietary_tags": ["dairy-free"],
+    "calories_per_serving": 490,
+    "protein_per_serving": 40,
+    "carbs_per_serving": 48,
+    "fat_per_serving": 13,
+    "status": "community",
+    "ingredients": [
+      { "section": "Beef", "position": 1, "quantity": 400, "unit": "g", "name": "beef sirloin or rump steak", "notes": "thinly sliced against the grain" },
+      { "section": "Beef", "position": 2, "quantity": 1, "unit": "tbsp", "name": "cornflour" },
+      { "section": "Sauce", "position": 3, "quantity": 3, "unit": "tbsp", "name": "soy sauce" },
+      { "section": "Sauce", "position": 4, "quantity": 1, "unit": "tbsp", "name": "oyster sauce" },
+      { "section": "Sauce", "position": 5, "quantity": 1, "unit": "tsp", "name": "sesame oil" },
+      { "section": "Sauce", "position": 6, "quantity": 1, "unit": "tsp", "name": "fresh ginger", "notes": "grated" },
+      { "section": "Sauce", "position": 7, "quantity": 2, "unit": "cloves", "name": "garlic", "notes": "minced" },
+      { "section": "Sauce", "position": 8, "quantity": 100, "unit": "ml", "name": "beef stock" },
+      { "section": "Veg", "position": 9, "quantity": 400, "unit": "g", "name": "broccoli", "notes": "cut into small florets" },
+      { "section": "Sides", "position": 10, "quantity": 250, "unit": "g", "name": "jasmine rice", "notes": "dry weight" }
+    ],
+    "steps": [
+      { "section": "Prep", "position": 1, "instruction": "Toss sliced beef in cornflour. Mix all sauce ingredients together in a bowl." },
+      { "section": "Rice", "position": 2, "instruction": "Cook rice according to package instructions." },
+      { "section": "Stir Fry", "position": 3, "instruction": "Heat a wok or large frying pan over very high heat until smoking. Add 1 tbsp neutral oil." },
+      { "section": "Stir Fry", "position": 4, "instruction": "Fry beef in batches for 1–2 minutes until browned. Remove and set aside. Do not crowd the pan." },
+      { "section": "Stir Fry", "position": 5, "instruction": "Add broccoli to the hot wok. Stir fry 3–4 minutes until bright green and tender-crisp." },
+      { "section": "Stir Fry", "position": 6, "instruction": "Return beef to the wok. Pour in sauce. Toss everything together for 1–2 minutes until the sauce thickens and everything is coated." },
+      { "section": "Serve", "position": 7, "instruction": "Serve immediately over rice." }
+    ]
+  },
+  {
+    "title": "Red Lentil & Coconut Dahl",
+    "description": "A warming, protein-rich dahl that meal preps brilliantly. Vegan, naturally gluten-free, and PCOS-friendly thanks to its low glycaemic load.",
+    "category": "Dinner",
+    "servings": 4,
+    "prep_time_mins": 10,
+    "cook_time_mins": 30,
+    "dietary_tags": ["vegan", "vegetarian", "gluten-free", "dairy-free", "pcos-friendly"],
+    "calories_per_serving": 370,
+    "protein_per_serving": 18,
+    "carbs_per_serving": 52,
+    "fat_per_serving": 10,
+    "status": "community",
+    "ingredients": [
+      { "section": "Main", "position": 1, "quantity": 300, "unit": "g", "name": "red lentils", "notes": "rinsed" },
+      { "section": "Main", "position": 2, "quantity": 400, "unit": "ml", "name": "coconut milk", "notes": "1 can" },
+      { "section": "Main", "position": 3, "quantity": 400, "unit": "g", "name": "tinned chopped tomatoes", "notes": "1 can" },
+      { "section": "Main", "position": 4, "quantity": 500, "unit": "ml", "name": "vegetable stock" },
+      { "section": "Aromatics", "position": 5, "quantity": 1, "unit": "", "name": "onion", "notes": "finely diced" },
+      { "section": "Aromatics", "position": 6, "quantity": 3, "unit": "cloves", "name": "garlic", "notes": "minced" },
+      { "section": "Aromatics", "position": 7, "quantity": 1, "unit": "tbsp", "name": "fresh ginger", "notes": "grated" },
+      { "section": "Spices", "position": 8, "quantity": 2, "unit": "tsp", "name": "ground cumin" },
+      { "section": "Spices", "position": 9, "quantity": 1, "unit": "tsp", "name": "ground turmeric" },
+      { "section": "Spices", "position": 10, "quantity": 1, "unit": "tsp", "name": "garam masala" },
+      { "section": "Spices", "position": 11, "quantity": 0.5, "unit": "tsp", "name": "chilli flakes", "notes": "adjust to taste" },
+      { "section": "Finish", "position": 12, "quantity": 1, "unit": "", "name": "lemon", "notes": "juice only" },
+      { "section": "Finish", "position": 13, "quantity": 100, "unit": "g", "name": "baby spinach" }
+    ],
+    "steps": [
+      { "section": "Base", "position": 1, "instruction": "Heat 1 tbsp oil in a large pan. Soften onion for 5 minutes. Add garlic and ginger, cook 1 minute." },
+      { "section": "Spices", "position": 2, "instruction": "Add cumin, turmeric, garam masala and chilli flakes. Stir and cook 30 seconds until fragrant." },
+      { "section": "Simmer", "position": 3, "instruction": "Add rinsed lentils, tinned tomatoes, coconut milk and stock. Stir to combine." },
+      { "section": "Simmer", "position": 4, "instruction": "Bring to boil, reduce heat and simmer uncovered for 20–25 minutes, stirring occasionally, until lentils are completely soft and the dahl is thick." },
+      { "section": "Finish", "position": 5, "instruction": "Stir in spinach and lemon juice. Season generously with salt. Serve with rice or naan bread." }
+    ]
+  },
+  {
+    "title": "Tuna & Sweetcorn Pasta",
+    "description": "The ultimate quick lunch. Storecupboard staples that come together in 15 minutes. High protein, filling, and works cold as a pasta salad too.",
+    "category": "Lunch",
+    "servings": 3,
+    "prep_time_mins": 5,
+    "cook_time_mins": 12,
+    "dietary_tags": ["dairy-free"],
+    "calories_per_serving": 470,
+    "protein_per_serving": 38,
+    "carbs_per_serving": 58,
+    "fat_per_serving": 8,
+    "status": "community",
+    "ingredients": [
+      { "section": "Main", "position": 1, "quantity": 300, "unit": "g", "name": "fusilli or penne", "notes": "dry weight" },
+      { "section": "Main", "position": 2, "quantity": 320, "unit": "g", "name": "tinned tuna in spring water", "notes": "2 cans, drained" },
+      { "section": "Main", "position": 3, "quantity": 200, "unit": "g", "name": "tinned sweetcorn", "notes": "drained" },
+      { "section": "Dressing", "position": 4, "quantity": 2, "unit": "tbsp", "name": "light mayonnaise" },
+      { "section": "Dressing", "position": 5, "quantity": 1, "unit": "tbsp", "name": "Greek yogurt" },
+      { "section": "Dressing", "position": 6, "quantity": 1, "unit": "", "name": "lemon", "notes": "juice only" },
+      { "section": "Dressing", "position": 7, "quantity": 1, "unit": "tsp", "name": "Dijon mustard" },
+      { "section": "Extras", "position": 8, "quantity": 0.5, "unit": "", "name": "red onion", "notes": "finely diced" },
+      { "section": "Extras", "position": 9, "quantity": 1, "unit": "handful", "name": "fresh parsley", "notes": "chopped" }
+    ],
+    "steps": [
+      { "section": "Pasta", "position": 1, "instruction": "Cook pasta in heavily salted boiling water until al dente. Drain and rinse under cold water to stop cooking." },
+      { "section": "Dressing", "position": 2, "instruction": "Mix mayonnaise, Greek yogurt, lemon juice and Dijon mustard together." },
+      { "section": "Combine", "position": 3, "instruction": "In a large bowl, combine cooled pasta, drained tuna, sweetcorn, red onion and parsley." },
+      { "section": "Combine", "position": 4, "instruction": "Add dressing and toss everything together. Season with salt and pepper." },
+      { "section": "Serve", "position": 5, "instruction": "Serve immediately or refrigerate for up to 3 days. Stir through a splash of water if it thickens in the fridge." }
+    ]
+  },
+  {
+    "title": "Cottage Cheese Scrambled Eggs",
+    "description": "Adding cottage cheese to scrambled eggs makes them extraordinarily creamy and doubles the protein. Takes 5 minutes and is the best breakfast upgrade you'll make.",
+    "category": "Breakfast",
+    "servings": 2,
+    "prep_time_mins": 2,
+    "cook_time_mins": 5,
+    "dietary_tags": ["vegetarian", "gluten-free", "pcos-friendly"],
+    "calories_per_serving": 240,
+    "protein_per_serving": 26,
+    "carbs_per_serving": 4,
+    "fat_per_serving": 13,
+    "status": "community",
+    "ingredients": [
+      { "section": "Main", "position": 1, "quantity": 4, "unit": "", "name": "eggs", "notes": "medium" },
+      { "section": "Main", "position": 2, "quantity": 150, "unit": "g", "name": "cottage cheese", "notes": "full-fat for creaminess" },
+      { "section": "Main", "position": 3, "quantity": 10, "unit": "g", "name": "unsalted butter" },
+      { "section": "Seasoning", "position": 4, "quantity": 0.25, "unit": "tsp", "name": "salt" },
+      { "section": "Seasoning", "position": 5, "quantity": 0.25, "unit": "tsp", "name": "black pepper" },
+      { "section": "Optional", "position": 6, "quantity": 1, "unit": "small bunch", "name": "chives", "notes": "snipped, to serve" }
+    ],
+    "steps": [
+      { "section": "Mix", "position": 1, "instruction": "Crack eggs into a bowl. Add cottage cheese, salt and pepper. Whisk together until combined — the mixture will look lumpy from the curds, that's fine." },
+      { "section": "Cook", "position": 2, "instruction": "Melt butter in a non-stick pan over low-medium heat. Pour in egg mixture." },
+      { "section": "Cook", "position": 3, "instruction": "Using a spatula, fold the eggs slowly from the edges to the centre. Remove pan from heat while still slightly underdone — residual heat finishes them." },
+      { "section": "Serve", "position": 4, "instruction": "Serve immediately on toast or with vegetables. Top with snipped chives." }
+    ]
+  },
+  {
+    "title": "High Protein Snack Plate",
+    "description": "No cooking required. A balanced, satiating snack plate designed around protein: boiled eggs, cottage cheese, turkey slices and fresh veg.",
+    "category": "Snacks",
+    "servings": 1,
+    "prep_time_mins": 5,
+    "cook_time_mins": 10,
+    "dietary_tags": ["gluten-free", "pcos-friendly"],
+    "calories_per_serving": 310,
+    "protein_per_serving": 34,
+    "carbs_per_serving": 14,
+    "fat_per_serving": 12,
+    "status": "community",
+    "ingredients": [
+      { "section": "Protein", "position": 1, "quantity": 2, "unit": "", "name": "eggs", "notes": "hard boiled" },
+      { "section": "Protein", "position": 2, "quantity": 100, "unit": "g", "name": "cottage cheese" },
+      { "section": "Protein", "position": 3, "quantity": 60, "unit": "g", "name": "turkey breast slices" },
+      { "section": "Veg", "position": 4, "quantity": 1, "unit": "", "name": "carrot", "notes": "cut into sticks" },
+      { "section": "Veg", "position": 5, "quantity": 0.5, "unit": "", "name": "cucumber", "notes": "sliced" },
+      { "section": "Extra", "position": 6, "quantity": 10, "unit": "g", "name": "mixed seeds", "notes": "pumpkin, sunflower" }
+    ],
+    "steps": [
+      { "section": "Eggs", "position": 1, "instruction": "Boil eggs for 8–10 minutes for hard boiled. Cool in cold water, peel and halve." },
+      { "section": "Plate", "position": 2, "instruction": "Arrange cottage cheese, turkey slices, halved eggs, carrot sticks and cucumber on a plate." },
+      { "section": "Serve", "position": 3, "instruction": "Sprinkle seeds over the cottage cheese. Season eggs with a pinch of salt and pepper." }
+    ]
+  }
+]

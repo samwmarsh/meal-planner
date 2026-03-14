@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(tree:*)",
+      "WebFetch(domain:www.janespatisserie.com)",
+      "Bash(cd:*)",
+      "Bash(docker run:*)",
+      "Bash(where npm:*)",
+      "Read(//c/Program Files/nodejs/**)",
+      "Bash(curl:*)",
+      "Bash(node:*)",
+      "Bash(docker compose:*)",
+      "Bash(TOKEN=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiaWF0IjoxNzczNTMxMzE4LCJleHAiOjE3NzQxMzYxMTh9._hohbO8lm9tFwu_ntIj4ujms2dm9omRK-zXq6UUJQ_g\"\n\necho \"=== GET /profile ===\"\ncurl -s http://localhost/api/profile -H \"Authorization: Bearer $TOKEN\"\n\necho -e \"\\\\n\\\\n=== PUT /profile \\(lose fat, 40/30/30, lbs\\) ===\"\ncurl -s -X PUT http://localhost/api/profile \\\\\n  -H \"Content-Type: application/json\" -H \"Authorization: Bearer $TOKEN\" \\\\\n  -d '{\"goal\":\"lose fat\",\"goal_pace\":\"moderate\",\"protein_pct\":40,\"carbs_pct\":30,\"fat_pct\":30,\"weight_unit\":\"lbs\",\"height_unit\":\"cm\",\"activity_level\":\"moderately active\",\"sex\":\"male\",\"height_cm\":178}' \n\necho -e \"\\\\n\\\\n=== GET /profile after save ===\"\ncurl -s http://localhost/api/profile -H \"Authorization: Bearer $TOKEN\")",
+      "Bash(TOKEN=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiaWF0IjoxNzczNTMxMzE4LCJleHAiOjE3NzQxMzYxMTh9._hohbO8lm9tFwu_ntIj4ujms2dm9omRK-zXq6UUJQ_g\"\n\necho \"=== POST /recipes/23/reparse-steps ===\"\ncurl -s -X POST http://localhost/api/recipes/23/reparse-steps \\\\\n  -H \"Authorization: Bearer $TOKEN\" | python3 -c \"\nimport sys,json\nd=json.load\\(sys.stdin\\)\nsteps = d.get\\('steps',[]\\)\nprint\\(f'{len\\(steps\\)} steps reparsed'\\)\nfor s in steps:\n    refs = s.get\\('ingredient_refs', []\\)\n    if refs:\n        print\\(f'  Step {s[\\\\\"position\\\\\"]}: {[{\\\\\"name\\\\\":r[\\\\\"name\\\\\"],\\\\\"qty\\\\\":r[\\\\\"quantity\\\\\"],\\\\\"unit\\\\\":r[\\\\\"unit\\\\\"]} for r in refs]}'\\)\n    else:\n        print\\(f'  Step {s[\\\\\"position\\\\\"]}: no refs detected'\\)\n\")",
+      "Bash(TOKEN=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiaWF0IjoxNzczNTMxMzE4LCJleHAiOjE3NzQxMzYxMTh9._hohbO8lm9tFwu_ntIj4ujms2dm9omRK-zXq6UUJQ_g\"\n\ndocker compose exec db psql -U mealplanner -d mealplanner -c \"\\\\d meal_plans\" 2>&1\n\ndocker compose exec db psql -U mealplanner -d mealplanner -c \"SELECT date, meal_type, recipe_id, servings FROM meal_plans WHERE user_id=1 ORDER BY date DESC LIMIT 10;\" 2>&1)",
+      "Bash(TOKEN=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiaWF0IjoxNzczNTMxMzE4LCJleHAiOjE3NzQxMzYxMTh9._hohbO8lm9tFwu_ntIj4ujms2dm9omRK-zXq6UUJQ_g\"\n\necho \"=== GET /shopping-list?weekStart=2026-03-09 ===\"\ncurl -s \"http://localhost/api/shopping-list?weekStart=2026-03-09\" -H \"Authorization: Bearer $TOKEN\" | python3 -c \"\nimport sys,json\nd=json.load\\(sys.stdin\\)\nprint\\('meals:', len\\(d.get\\('meals',[]\\)\\)\\)\nprint\\('ingredients:', len\\(d.get\\('ingredients',[]\\)\\)\\)\nfor m in d.get\\('meals',[]\\):\n    print\\(f'  meal: {m[\\\\\"day\\\\\"]} {m[\\\\\"meal_type\\\\\"]} - {m[\\\\\"meal_name\\\\\"]}'\\)\nfor i in d.get\\('ingredients',[]\\)[:5]:\n    print\\(f'  ing: {i.get\\(\\\\\"totalQuantity\\\\\",\\\\\"?\\\\\"\\)} {i.get\\(\\\\\"unit\\\\\",\\\\\"\\\\\"\\)} {i.get\\(\\\\\"name\\\\\"\\)}'\\)\n\")",
+      "Bash(git add:*)"
+    ]
+  }
+}
