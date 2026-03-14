@@ -172,14 +172,53 @@ Each day, users can log:
 
 ### 7. Shopping List
 
+#### 7a. Plan View (existing `/shopping-list` page)
+
 Generated from the current week's meal plan:
 
 - **Ingredient consolidation:** same ingredient across multiple recipes is summed (e.g. `5 eggs` not `2 + 3`)
 - **Unit normalisation:** convert compatible units before summing (e.g. `200ml + 0.5L = 700ml`)
-- **Grouped by category:** Produce · Dairy · Meat & Fish · Bakery · Dry Goods · Frozen · Other
-- **Pantry mode:** mark items you already have → excluded from the list
-- **Check-off while shopping:** tap to strike through items
+- **Multi-use expansion:** tap ingredient to see which recipes/days use it and scaled quantities
+- **"Save for Shopping" button** — snapshots the current ingredient list into a saved shopping trip (stored server-side)
 - **Export:** share as plain text or copy to clipboard
+
+#### 7b. Active Shopping Trip (`/shopping-list/active` or modal overlay)
+
+A persistent, check-off-as-you-go view of a saved trip:
+
+- **Item rows:** ingredient name + quantity + unit, tap to check off (strikethrough + muted style)
+- **Progress bar / counter:** "12 of 18 items" — updates live as you check
+- **Grouped by category:** Produce · Dairy · Meat & Fish · Bakery · Dry Goods · Frozen · Other (auto-assigned at save time; overridable)
+- **Add custom item:** freetext row for things not in the plan (e.g. household items)
+- **Uncheck all / reset** — start the trip over without losing the list
+- **Complete trip** — archives the list; returns to plan view
+- **One active trip at a time** — saving a new one prompts "replace active list?"
+
+#### 7b. Data Model additions
+
+```sql
+CREATE TABLE shopping_trips (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  week_start DATE,
+  name VARCHAR(100),          -- e.g. "Week of 17 Mar"
+  status VARCHAR(20) DEFAULT 'active',   -- 'active' | 'completed'
+  created_at TIMESTAMP DEFAULT NOW(),
+  completed_at TIMESTAMP
+);
+
+CREATE TABLE shopping_trip_items (
+  id SERIAL PRIMARY KEY,
+  trip_id INTEGER REFERENCES shopping_trips(id) ON DELETE CASCADE,
+  name VARCHAR(200) NOT NULL,
+  quantity NUMERIC,
+  unit VARCHAR(30),
+  category VARCHAR(50) DEFAULT 'Other',  -- Produce | Dairy | Meat & Fish | Bakery | Dry Goods | Frozen | Other
+  checked BOOLEAN DEFAULT false,
+  custom BOOLEAN DEFAULT false,          -- true if manually added by user
+  position INTEGER
+);
+```
 
 ---
 
@@ -213,16 +252,21 @@ Generated from the current week's meal plan:
 13. ✅ **Goal-based macro presets** — switching goal auto-applies sensible protein/carbs/fat split; macro display as read-only tiles (not editable inputs)
 14. ✅ **Recipe slug URLs** — `/recipes/:id-slug-title` format; RecipeDetail extracts ID from slug
 15. **Create recipe from scratch** — form to manually enter title, category, description, servings, timings, macros, ingredients (add/remove rows), method steps
-16. **UI polish pass 2** — production-ready feel throughout:
+16. **Active shopping trip** — "Save for Shopping" snapshots the week's ingredient list; `/shopping-list/active` lets you check off items in-store, add custom items, group by category, and complete/archive the trip
+17. **UI polish pass 2** — production-ready feel throughout:
    - Toast notifications (replace inline success/error text)
    - Loading skeletons instead of plain "Loading…" text
    - Responsive/mobile layout improvements
    - Dashboard home page (today's macro summary card, recent weight, quick-add shortcuts)
-17. **Progress charts** — weight trend, calorie intake vs target, macro breakdown over time
-18. **Meal plan templates + copy previous week**
-19. **Workout tracking** — exercise log, sets/reps, templates
-20. **Admin approval queue** — community recipe submissions
-21. **PWA** — installable, works offline for viewing
+   - Delete recipe button
+   - Shopping list unit normalisation (200ml + 0.5L → 700ml)
+18. **Progress charts** — weight trend, calorie intake vs target, macro breakdown over time
+19. **Full daily log** — sleep hours/quality and water intake (fields exist in DB, UI only shows weight)
+20. **Calendar macro colour coding** — green/amber/red cells based on proximity to daily targets
+21. **Meal plan templates + copy previous week**
+22. **Workout tracking** — exercise log, sets/reps, templates
+23. **Admin approval queue** — community recipe submissions
+24. **PWA** — installable, works offline for viewing
 
 ---
 
