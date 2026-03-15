@@ -61,6 +61,11 @@ Required:
 - `DB_USER` — PostgreSQL user (default: mealplanner)
 - `DB_NAME` — database name (default: mealplanner)
 
+Optional:
+- `STRAVA_CLIENT_ID` — Strava OAuth app client ID (leave empty to hide Strava UI)
+- `STRAVA_CLIENT_SECRET` — Strava OAuth app secret
+- `STRAVA_REDIRECT_URI` — OAuth callback URL (default: http://localhost/api/strava/callback)
+
 ## Key Conventions
 
 - Backend routes: REST, JSON, all API routes served under `/api/` via nginx proxy
@@ -80,9 +85,12 @@ recipe_ingredients (id, recipe_id, section, position, quantity, unit, name, note
 recipe_steps   (id, recipe_id, section, position, instruction, ingredient_refs)
 meal_plans     (id, user_id, date, meal_type, meal_id, recipe_id, servings)
                UNIQUE(user_id, date, meal_type)
-daily_logs     (id, user_id, date, weight_kg, sleep_hours, water_ml, notes)
+daily_logs     (id, user_id, date, weight_kg, sleep_hours, water_ml, steps, notes)
 shopping_trips (id, user_id, week_start, name, status)
 shopping_trip_items (id, trip_id, name, quantity, unit, category, checked, custom)
+recipe_reviews     (id, recipe_id, user_id, rating, comment, created_at, updated_at)
+               UNIQUE(recipe_id, user_id)
+strava_connections (user_id PK, strava_athlete_id, access_token, refresh_token, expires_at)
 ```
 
 ## Known Issues / Tech Debt

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
 import API_BASE_URL from '../config';
+import { useToast } from './ToastContext';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -79,9 +80,38 @@ const Skeleton = () => (
 const AddToPlanModal = ({ recipe, onClose, onConfirm, servings }) => {
   const [date, setDate] = useState(todayDateString());
   const [mealType, setMealType] = useState(categoryToMealType(recipe.category));
+  const [existingSlots, setExistingSlots] = useState({});
+
+  // Fetch existing meal plans for the selected date to find next snack slot
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (!token || !date) return;
+    const [year, month] = date.split('-');
+    axios
+      .get(`${API_BASE_URL}/meal-plans`, {
+        headers: { Authorization: `Bearer ${token}` },
+        params: { year, month },
+      })
+      .then(res => {
+        const dayPlans = res.data.filter(p => p.date && p.date.slice(0, 10) === date && (p.meal_id || p.recipe_id));
+        const slots = {};
+        dayPlans.forEach(p => { slots[p.meal_type] = true; });
+        setExistingSlots(slots);
+      })
+      .catch(() => {});
+  }, [date]);
+
+  const getNextSnackSlotForDate = () => {
+    if (!existingSlots['Snacks']) return 'Snacks';
+    let i = 2;
+    while (existingSlots[`Snacks-${i}`]) i++;
+    return `Snacks-${i}`;
+  };
 
   const handleConfirm = () => {
-    onConfirm(date, mealType);
+    // If user selected Snacks, use the next available snack slot
+    const actualType = mealType === 'Snacks' ? getNextSnackSlotForDate() : mealType;
+    onConfirm(date, actualType);
   };
 
   return (
@@ -329,6 +359,7 @@ const RecipeDetail = () => {
   // Support slug URLs like /recipes/42-chicken-stir-fry — extract numeric ID prefix
   const id = idParam.split('-')[0];
   const navigate = useNavigate();
+  const toast = useToast();
 
   const [recipe, setRecipe] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -338,8 +369,16 @@ const RecipeDetail = () => {
   const [servings, setServings] = useState(1);
   const [showModal, setShowModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
-  const [addSuccess, setAddSuccess] = useState(null);
-  const [addError, setAddError] = useState(null);
+
+  // Reviews state
+  const [reviews, setReviews] = useState([]);
+  const [avgRating, setAvgRating] = useState(null);
+  const [reviewCount, setReviewCount] = useState(0);
+  const [myRating, setMyRating] = useState(0);
+  const [myComment, setMyComment] = useState('');
+  const [hoverRating, setHoverRating] = useState(0);
+  const [submittingReview, setSubmittingReview] = useState(false);
+  const [myExistingReview, setMyExistingReview] = useState(null);
 
   // ── Fetch recipe ──────────────────────────────────────────────────────────
 
@@ -372,6 +411,63 @@ const RecipeDetail = () => {
     fetchRecipe();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
+
+  // ── Fetch reviews ──────────────────────────────────────────────────────────
+
+  const fetchReviews = () => {
+    axios.get(`${API_BASE_URL}/recipes/${id}/reviews`).then(res => {
+      setReviews(res.data.reviews || []);
+      setAvgRating(res.data.average_rating);
+      setReviewCount(res.data.count || 0);
+      // Check if current user already has a review
+      const token = localStorage.getItem('token');
+      if (token) {
+        try {
+          const payload = JSON.parse(atob(token.split('.')[1]));
+          const userId = payload.id;
+          const mine = (res.data.reviews || []).find(r => r.user_id === userId);
+          if (mine) {
+            setMyExistingReview(mine);
+            setMyRating(mine.rating);
+            setMyComment(mine.comment || '');
+          }
+        } catch { /* ignore */ }
+      }
+    }).catch(() => {});
+  };
+
+  useEffect(() => {
+    fetchReviews();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
+
+  const handleSubmitReview = async () => {
+    if (myRating < 1) return;
+    setSubmittingReview(true);
+    try {
+      const token = localStorage.getItem('token');
+      await axios.post(
+        `${API_BASE_URL}/recipes/${id}/reviews`,
+        { rating: myRating, comment: myComment || null },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      fetchReviews();
+    } catch { /* silent */ }
+    setSubmittingReview(false);
+  };
+
+  const handleDeleteReview = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      await axios.delete(`${API_BASE_URL}/recipes/${id}/reviews`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setMyExistingReview(null);
+      setMyRating(0);
+      setMyComment('');
+      fetchReviews();
+    } catch { /* silent */ }
+  };
 
   // ── Derived values ────────────────────────────────────────────────────────
 
@@ -413,25 +509,28 @@ const RecipeDetail = () => {
     ? [...recipe.steps].sort((a, b) => a.position - b.position)
     : [];
 
-  // Map ingredient_id -> total quantity from the ingredient list
+  // Scale factor for servings adjustment
+  const scaleFactor = recipe ? servings / recipe.servings : 1;
+
+  // Map ingredient_id -> SCALED total quantity from the ingredient list
   const ingredientTotals = {};
   if (recipe) {
     for (const ing of recipe.ingredients) {
-      if (ing.quantity != null) ingredientTotals[ing.id] = ing.quantity;
+      if (ing.quantity != null) ingredientTotals[ing.id] = ing.quantity * scaleFactor;
     }
   }
 
   // For each step, compute how much of each referenced ingredient has been used
   // by *previous* steps (so we can show "Xg remaining before this step").
-  // Returns a map: ingredient_id -> usedSoFar (NOT including this step)
+  // All quantities are SCALED by the servings adjuster.
   const usedBeforeStep = {};
-  const runningUsed = {}; // ingredient_id -> cumulative used so far
+  const runningUsed = {}; // ingredient_id -> cumulative used so far (scaled)
   for (const step of stepsOrdered) {
     usedBeforeStep[step.id] = { ...runningUsed };
     const refs = Array.isArray(step.ingredient_refs) ? step.ingredient_refs : [];
     for (const ref of refs) {
       if (ref.quantity != null) {
-        runningUsed[ref.ingredient_id] = (runningUsed[ref.ingredient_id] || 0) + ref.quantity;
+        runningUsed[ref.ingredient_id] = (runningUsed[ref.ingredient_id] || 0) + ref.quantity * scaleFactor;
       }
     }
   }
@@ -447,12 +546,26 @@ const RecipeDetail = () => {
         { headers: { Authorization: `Bearer ${token}` } }
       );
       setShowModal(false);
-      setAddSuccess(`Added to ${mealType} on ${date}`);
-      setTimeout(() => setAddSuccess(null), 3000);
+      toast(`Added to ${mealType} on ${date}`, 'success');
     } catch (err) {
       setShowModal(false);
-      setAddError('Failed to add to plan. Please try again.');
-      setTimeout(() => setAddError(null), 3000);
+      toast('Failed to add to plan. Please try again.', 'error');
+    }
+  };
+
+  // ── Delete recipe ────────────────────────────────────────────────────────
+
+  const handleDelete = async () => {
+    if (!window.confirm('Are you sure you want to delete this recipe? This cannot be undone.')) return;
+    const token = localStorage.getItem('token');
+    try {
+      await axios.delete(`${API_BASE_URL}/recipes/${id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      navigate('/recipes');
+    } catch (err) {
+      const msg = err.response?.data?.error || 'Failed to delete recipe.';
+      setError(msg);
     }
   };
 
@@ -522,6 +635,15 @@ const RecipeDetail = () => {
         </Link>
 
         <div className="flex items-center gap-2">
+        <button
+          onClick={handleDelete}
+          className="inline-flex items-center gap-2 px-4 py-2 border border-red-300 hover:bg-red-50 text-red-600 text-sm font-semibold rounded-lg shadow-sm transition-colors"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+          </svg>
+          Delete
+        </button>
         <button
           onClick={() => setShowEditModal(true)}
           className="inline-flex items-center gap-2 px-4 py-2 border border-slate-300 hover:bg-slate-50 text-slate-700 text-sm font-semibold rounded-lg shadow-sm transition-colors"
@@ -734,11 +856,12 @@ const RecipeDetail = () => {
                                   {refs.map((ref, ri) => {
                                     const total = ingredientTotals[ref.ingredient_id];
                                     const usedPrior = usedBefore[ref.ingredient_id] || 0;
-                                    const remaining = (total != null && ref.quantity != null)
-                                      ? +(total - usedPrior - ref.quantity).toFixed(2)
+                                    const scaledRefQty = ref.quantity != null ? parseFloat((ref.quantity * scaleFactor).toFixed(2)) : null;
+                                    const remaining = (total != null && scaledRefQty != null)
+                                      ? +(total - usedPrior - scaledRefQty).toFixed(2)
                                       : null;
-                                    const qtyStr = ref.quantity != null
-                                      ? `${ref.quantity % 1 === 0 ? ref.quantity : ref.quantity}${ref.unit ? ref.unit : ''}`
+                                    const qtyStr = scaledRefQty != null
+                                      ? `${scaledRefQty % 1 === 0 ? scaledRefQty : scaledRefQty}${ref.unit ? ref.unit : ''}`
                                       : null;
                                     return (
                                       <span key={ri} className="inline-flex items-center gap-1.5 text-xs bg-amber-50 border border-amber-200 text-amber-800 rounded-full px-2.5 py-1 font-medium">
@@ -762,6 +885,108 @@ const RecipeDetail = () => {
                   </div>
                 </div>
               ))}
+            </div>
+          </div>
+          {/* Reviews */}
+          <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+              <h2 className="text-lg font-bold text-slate-800">Reviews</h2>
+              {avgRating !== null && (
+                <div className="flex items-center gap-2">
+                  <div className="flex">
+                    {[1,2,3,4,5].map(s => (
+                      <svg key={s} className={`w-4 h-4 ${s <= Math.round(avgRating) ? 'text-amber-400' : 'text-slate-200'}`}
+                        fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                      </svg>
+                    ))}
+                  </div>
+                  <span className="text-sm font-semibold text-slate-700">{avgRating}</span>
+                  <span className="text-xs text-slate-400">({reviewCount})</span>
+                </div>
+              )}
+            </div>
+
+            <div className="px-6 py-4 space-y-4">
+              {/* Write / edit review form */}
+              <div className="bg-slate-50 border border-slate-100 rounded-xl p-4">
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
+                  {myExistingReview ? 'Update your review' : 'Write a review'}
+                </p>
+                <div className="flex items-center gap-1 mb-3">
+                  {[1,2,3,4,5].map(s => (
+                    <button
+                      key={s}
+                      onMouseEnter={() => setHoverRating(s)}
+                      onMouseLeave={() => setHoverRating(0)}
+                      onClick={() => setMyRating(s)}
+                      className="focus:outline-none"
+                    >
+                      <svg className={`w-6 h-6 transition-colors ${
+                        s <= (hoverRating || myRating) ? 'text-amber-400' : 'text-slate-200'
+                      }`} fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                      </svg>
+                    </button>
+                  ))}
+                  {myRating > 0 && <span className="text-sm text-slate-500 ml-2">{myRating}/5</span>}
+                </div>
+                <textarea
+                  value={myComment}
+                  onChange={e => setMyComment(e.target.value)}
+                  placeholder="Add a comment (optional)..."
+                  rows={2}
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none mb-3"
+                />
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleSubmitReview}
+                    disabled={myRating < 1 || submittingReview}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors"
+                  >
+                    {submittingReview ? 'Saving...' : myExistingReview ? 'Update Review' : 'Submit Review'}
+                  </button>
+                  {myExistingReview && (
+                    <button
+                      onClick={handleDeleteReview}
+                      className="px-4 py-2 border border-red-200 text-red-600 hover:bg-red-50 text-sm font-medium rounded-lg transition-colors"
+                    >
+                      Delete
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Review list */}
+              {reviews.length === 0 ? (
+                <p className="text-sm text-slate-400 text-center py-4">No reviews yet. Be the first!</p>
+              ) : (
+                <div className="divide-y divide-slate-100">
+                  {reviews.map(review => (
+                    <div key={review.id} className="py-3 first:pt-0 last:pb-0">
+                      <div className="flex items-center justify-between mb-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-semibold text-slate-700">{review.username}</span>
+                          <div className="flex">
+                            {[1,2,3,4,5].map(s => (
+                              <svg key={s} className={`w-3.5 h-3.5 ${s <= review.rating ? 'text-amber-400' : 'text-slate-200'}`}
+                                fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                              </svg>
+                            ))}
+                          </div>
+                        </div>
+                        <span className="text-xs text-slate-400">
+                          {new Date(review.created_at).toLocaleDateString()}
+                        </span>
+                      </div>
+                      {review.comment && (
+                        <p className="text-sm text-slate-600 leading-relaxed">{review.comment}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -801,20 +1026,6 @@ const RecipeDetail = () => {
         />
       )}
 
-      {/* Toast notifications */}
-      {addSuccess && (
-        <div className="fixed top-4 right-4 z-50 bg-green-600 text-white px-4 py-3 rounded-xl shadow-lg text-sm font-medium flex items-center gap-2">
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-          </svg>
-          {addSuccess}
-        </div>
-      )}
-      {addError && (
-        <div className="fixed top-4 right-4 z-50 bg-red-600 text-white px-4 py-3 rounded-xl shadow-lg text-sm font-medium">
-          {addError}
-        </div>
-      )}
     </div>
   );
 };

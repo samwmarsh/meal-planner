@@ -60,6 +60,26 @@ const GOAL_MACRO_PRESETS = {
   'body recomposition': { protein_pct: 40, carbs_pct: 35, fat_pct: 25 },
 };
 
+// Dietary requirement macro overrides — these take priority over goal presets
+const DIETARY_MACRO_PRESETS = {
+  pcos:          { protein_pct: 30, carbs_pct: 25, fat_pct: 45 },
+  keto:          { protein_pct: 25, carbs_pct: 5,  fat_pct: 70 },
+  low_carb:      { protein_pct: 30, carbs_pct: 20, fat_pct: 50 },
+  high_protein:  { protein_pct: 40, carbs_pct: 35, fat_pct: 25 },
+  vegan:         { protein_pct: 25, carbs_pct: 50, fat_pct: 25 },
+  diabetic:      { protein_pct: 30, carbs_pct: 30, fat_pct: 40 },
+};
+
+const DIETARY_OPTIONS = [
+  { value: 'none',         label: 'No specific requirements' },
+  { value: 'pcos',         label: 'PCOS-friendly (lower carbs, higher protein)' },
+  { value: 'keto',         label: 'Keto (very low carb, high fat)' },
+  { value: 'low_carb',     label: 'Low Carb (reduced carbohydrates)' },
+  { value: 'high_protein', label: 'High Protein (muscle building focus)' },
+  { value: 'vegan',        label: 'Vegan (plant-based, adjusted protein sources)' },
+  { value: 'diabetic',     label: 'Diabetic-friendly (controlled carbs)' },
+];
+
 const GOAL_DESCRIPTIONS = {
   'lose fat': 'Create a calorie deficit to burn stored fat.',
   maintain:   'Eat at your maintenance level to stay the same weight.',
@@ -92,7 +112,7 @@ const StyledSelect = ({ label, name, value, onChange, children }) => (
 const GoalsPage = () => {
   const [profile, setProfile] = useState(null);
   const [form, setForm] = useState({
-    goal: 'maintain', goal_pace: 'moderate',
+    dietary_requirement: 'none', goal: 'maintain', goal_pace: 'moderate',
     protein_pct: 30, carbs_pct: 40, fat_pct: 30,
   });
   const [latestWeightKg, setLatestWeightKg] = useState(null);
@@ -109,6 +129,7 @@ const GoalsPage = () => {
         setProfile(data);
         setLatestWeightKg(data.latest_weight_kg ?? null);
         setForm({
+          dietary_requirement: data.dietary_requirement || 'none',
           goal:        data.goal        || 'maintain',
           goal_pace:   data.goal_pace   || 'moderate',
           protein_pct: data.protein_pct ?? 30,
@@ -122,8 +143,19 @@ const GoalsPage = () => {
 
   const handleChange = e => {
     const { name, value } = e.target;
-    if (name === 'goal') {
-      const preset = GOAL_MACRO_PRESETS[value] || {};
+    if (name === 'dietary_requirement') {
+      const preset = DIETARY_MACRO_PRESETS[value] || null;
+      if (preset) {
+        setForm(p => ({ ...p, [name]: value, ...preset }));
+      } else {
+        // "none" — revert to goal-based defaults
+        const goalPreset = GOAL_MACRO_PRESETS[form.goal] || {};
+        setForm(p => ({ ...p, [name]: value, ...goalPreset }));
+      }
+    } else if (name === 'goal') {
+      // Only apply goal presets if no dietary requirement is active
+      const hasDietary = form.dietary_requirement && form.dietary_requirement !== 'none';
+      const preset = hasDietary ? {} : (GOAL_MACRO_PRESETS[value] || {});
       setForm(p => ({ ...p, [name]: value, ...preset }));
     } else {
       setForm(p => ({ ...p, [name]: value }));
@@ -148,6 +180,7 @@ const GoalsPage = () => {
         height_cm:      profile?.height_cm       ? parseFloat(profile.height_cm) : null,
         activity_level: profile?.activity_level  ?? 'moderately active',
         // goals fields
+        dietary_requirement: form.dietary_requirement === 'none' ? null : form.dietary_requirement,
         goal:           form.goal,
         goal_pace:      form.goal_pace,
         protein_pct:    parseFloat(form.protein_pct),
@@ -240,6 +273,19 @@ const GoalsPage = () => {
           <div className="p-6 space-y-5">
 
             <div>
+              <StyledSelect label="Dietary Requirement" name="dietary_requirement" value={form.dietary_requirement} onChange={handleChange}>
+                {DIETARY_OPTIONS.map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </StyledSelect>
+              {form.dietary_requirement && form.dietary_requirement !== 'none' && (
+                <p className="mt-2 text-xs text-indigo-600 bg-indigo-50 border border-indigo-100 rounded-lg px-3 py-2">
+                  Macro split set by <span className="font-semibold">{DIETARY_OPTIONS.find(o => o.value === form.dietary_requirement)?.label || form.dietary_requirement}</span> preset.
+                </p>
+              )}
+            </div>
+
+            <div>
               <StyledSelect label="Goal" name="goal" value={form.goal} onChange={handleChange}>
                 <option value="lose fat">Lose fat</option>
                 <option value="maintain">Maintain</option>
@@ -270,7 +316,18 @@ const GoalsPage = () => {
 
             {/* Macro split */}
             <div>
-              <p className="block text-sm font-medium text-slate-600 mb-3">Macro split</p>
+              <div className="flex items-center justify-between mb-3">
+                <p className="block text-sm font-medium text-slate-600">Macro split</p>
+                {form.dietary_requirement && form.dietary_requirement !== 'none' ? (
+                  <span className="text-xs font-medium text-indigo-600 bg-indigo-50 rounded-full px-2.5 py-0.5">
+                    {DIETARY_OPTIONS.find(o => o.value === form.dietary_requirement)?.label.split(' (')[0] || form.dietary_requirement} preset
+                  </span>
+                ) : (
+                  <span className="text-xs font-medium text-slate-400 bg-slate-50 rounded-full px-2.5 py-0.5">
+                    Based on goal
+                  </span>
+                )}
+              </div>
               <div className="flex rounded-full overflow-hidden h-3 mb-4 gap-px bg-slate-100">
                 {macroTotal > 0 ? (
                   <>

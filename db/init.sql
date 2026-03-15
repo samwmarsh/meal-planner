@@ -41,6 +41,7 @@ CREATE TABLE IF NOT EXISTS user_profiles (
   protein_pct NUMERIC DEFAULT 30,
   carbs_pct NUMERIC DEFAULT 40,
   fat_pct NUMERIC DEFAULT 30,
+  dietary_requirement VARCHAR(50),
   weight_unit VARCHAR(10) DEFAULT 'kg',
   height_unit VARCHAR(10) DEFAULT 'cm',
   updated_at TIMESTAMP DEFAULT NOW()
@@ -54,6 +55,7 @@ CREATE TABLE IF NOT EXISTS daily_logs (
   sleep_hours NUMERIC,
   sleep_quality SMALLINT CHECK (sleep_quality BETWEEN 1 AND 5),
   water_ml INTEGER,
+  steps INTEGER,
   notes TEXT,
   UNIQUE(user_id, date)
 );
@@ -147,3 +149,97 @@ CREATE TABLE IF NOT EXISTS recipe_steps (
   instruction TEXT NOT NULL,
   ingredient_refs JSONB DEFAULT '[]'
 );
+
+CREATE TABLE IF NOT EXISTS meal_plan_templates (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  name VARCHAR(100) NOT NULL,
+  slots JSONB NOT NULL,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS recipe_reviews (
+  id SERIAL PRIMARY KEY,
+  recipe_id INTEGER REFERENCES recipes(id) ON DELETE CASCADE,
+  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  rating SMALLINT NOT NULL CHECK (rating BETWEEN 1 AND 5),
+  comment TEXT,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW(),
+  UNIQUE(recipe_id, user_id)
+);
+
+CREATE TABLE IF NOT EXISTS exercises (
+  id SERIAL PRIMARY KEY,
+  name VARCHAR(100) NOT NULL,
+  category VARCHAR(30),
+  muscle_groups TEXT[]
+);
+
+CREATE TABLE IF NOT EXISTS workout_logs (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  date DATE NOT NULL,
+  name VARCHAR(100),
+  notes TEXT,
+  strava_activity_id BIGINT,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS strava_connections (
+  user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  strava_athlete_id BIGINT,
+  access_token TEXT,
+  refresh_token TEXT,
+  expires_at BIGINT,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS workout_sets (
+  id SERIAL PRIMARY KEY,
+  workout_log_id INTEGER REFERENCES workout_logs(id) ON DELETE CASCADE,
+  exercise_id INTEGER REFERENCES exercises(id),
+  set_number INTEGER,
+  reps INTEGER,
+  weight_kg NUMERIC,
+  duration_secs INTEGER,
+  distance_m NUMERIC
+);
+
+CREATE TABLE IF NOT EXISTS workout_templates (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  name VARCHAR(100) NOT NULL,
+  exercises JSONB NOT NULL,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Seed common exercises
+INSERT INTO exercises (name, category, muscle_groups) VALUES
+  ('Bench Press', 'Strength', ARRAY['Chest', 'Triceps', 'Shoulders']),
+  ('Incline Bench Press', 'Strength', ARRAY['Chest', 'Shoulders']),
+  ('Squat', 'Strength', ARRAY['Quads', 'Glutes', 'Hamstrings']),
+  ('Deadlift', 'Strength', ARRAY['Back', 'Glutes', 'Hamstrings']),
+  ('Overhead Press', 'Strength', ARRAY['Shoulders', 'Triceps']),
+  ('Barbell Row', 'Strength', ARRAY['Back', 'Biceps']),
+  ('Dumbbell Curl', 'Strength', ARRAY['Biceps']),
+  ('Tricep Pushdown', 'Strength', ARRAY['Triceps']),
+  ('Lateral Raise', 'Strength', ARRAY['Shoulders']),
+  ('Leg Press', 'Strength', ARRAY['Quads', 'Glutes']),
+  ('Romanian Deadlift', 'Strength', ARRAY['Hamstrings', 'Glutes']),
+  ('Cable Row', 'Strength', ARRAY['Back', 'Biceps']),
+  ('Lat Pulldown', 'Strength', ARRAY['Back', 'Biceps']),
+  ('Pull-ups', 'Bodyweight', ARRAY['Back', 'Biceps']),
+  ('Plank', 'Bodyweight', ARRAY['Core']),
+  ('Lunges', 'Bodyweight', ARRAY['Quads', 'Glutes']),
+  ('Push-ups', 'Bodyweight', ARRAY['Chest', 'Triceps']),
+  ('Dips', 'Bodyweight', ARRAY['Chest', 'Triceps']),
+  ('Running', 'Cardio', ARRAY['Legs', 'Cardio']),
+  ('Cycling', 'Cardio', ARRAY['Legs', 'Cardio']),
+  ('Swimming', 'Cardio', ARRAY['Full Body']),
+  ('Rowing Machine', 'Cardio', ARRAY['Full Body']),
+  ('Elliptical', 'Cardio', ARRAY['Full Body']),
+  ('Jump Rope', 'Cardio', ARRAY['Full Body']),
+  ('Walking', 'Cardio', ARRAY['Legs']),
+  ('HIIT', 'Cardio', ARRAY['Full Body'])
+ON CONFLICT DO NOTHING;

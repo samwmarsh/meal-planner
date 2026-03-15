@@ -25,6 +25,9 @@ services:
       PORT: 5000
       NODE_ENV: production
       ALLOWED_ORIGINS: http://localhost
+      STRAVA_CLIENT_ID: ${STRAVA_CLIENT_ID:-}
+      STRAVA_CLIENT_SECRET: ${STRAVA_CLIENT_SECRET:-}
+      STRAVA_REDIRECT_URI: ${STRAVA_REDIRECT_URI:-http://localhost/api/strava/callback}
     depends_on:
       db:
         condition: service_healthy

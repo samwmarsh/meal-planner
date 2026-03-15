@@ -195,15 +195,106 @@ app.get('/shopping-list', authenticateToken, async (req, res) => {
       [userId, startStr, endStr]
     );
 
-    // Aggregate by (name lowercased, unit)
+    // ── Unit normalisation ──────────────────────────────────────────────
+    // Convert compatible units to a canonical base unit before aggregation,
+    // then convert back to the most readable unit for display.
+    const unitGroups = {
+      // mass → canonical: g
+      g:  { canonical: 'g', factor: 1 },
+      kg: { canonical: 'g', factor: 1000 },
+      // volume → canonical: ml
+      ml: { canonical: 'ml', factor: 1 },
+      l:  { canonical: 'ml', factor: 1000 },
+      // small volume → canonical: tsp
+      tsp:  { canonical: 'tsp', factor: 1 },
+      tbsp: { canonical: 'tsp', factor: 3 },
+      cup:  { canonical: 'tsp', factor: 48 },  // 16 tbsp × 3 tsp
+    };
+
+    function normaliseUnit(unit) {
+      const lower = (unit || '').toLowerCase().trim();
+      const group = unitGroups[lower];
+      if (!group) return { canonical: unit || '', factor: 1 };
+      return group;
+    }
+
+    function readableQuantity(qty, canonicalUnit) {
+      if (qty == null) return { quantity: null, unit: canonicalUnit };
+      if (canonicalUnit === 'g' && qty >= 1000) {
+        return { quantity: Math.round((qty / 1000) * 100) / 100, unit: 'kg' };
+      }
+      if (canonicalUnit === 'ml' && qty >= 1000) {
+        return { quantity: Math.round((qty / 1000) * 100) / 100, unit: 'L' };
+      }
+      if (canonicalUnit === 'tsp' && qty >= 48) {
+        return { quantity: Math.round((qty / 48) * 100) / 100, unit: 'cup' };
+      }
+      if (canonicalUnit === 'tsp' && qty >= 3) {
+        return { quantity: Math.round((qty / 3) * 100) / 100, unit: 'tbsp' };
+      }
+      return { quantity: Math.round(qty * 100) / 100, unit: canonicalUnit };
+    }
+
+    // ── Ingredient name normalisation ─────────────────────────────────
+    // Strip prep instructions and normalise plurals so similar ingredients
+    // (e.g. "garlic cloves crushed" and "garlic clove finely grated") merge.
+    const prepPhrases = [
+      'drained and rinsed', 'finely grated', 'finely chopped', 'finely diced',
+      'finely sliced', 'roughly chopped', 'roughly torn', 'thinly sliced',
+      'sliced into strips', 'cut into chunks', 'cut into pieces',
+      'to taste', 'to serve',
+      'crushed', 'diced', 'minced', 'sliced', 'chopped', 'grated',
+      'peeled', 'trimmed', 'halved', 'quartered', 'deseeded', 'torn',
+      'drained', 'rinsed', 'optional', 'fresh', 'dried',
+    ];
+    // Build a single regex that strips any of these phrases (globally)
+    const prepRegex = new RegExp(
+      '\\b(' + prepPhrases.map(p => p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|') + ')\\b', 'gi'
+    );
+
+    const pluralRules = [
+      [/leaves$/i, 'leaf'],
+      [/ves$/i, 've'],          // halves → halve (rare, but safe)
+      [/ies$/i, 'y'],           // berries → berry
+      [/ses$/i, 'se'],          // purses → purse  (avoids stripping 'es' from 'ses')
+      [/ches$/i, 'ch'],         // peaches → peach
+      [/shes$/i, 'sh'],         // radishes → radish
+      [/sses$/i, 'ss'],        // grasses → grass
+      [/breasts$/i, 'breast'],
+      [/thighs$/i, 'thigh'],
+      [/cloves$/i, 'clove'],
+      [/s$/i, ''],              // generic trailing s
+    ];
+
+    function normaliseIngredientName(name) {
+      let n = (name || '').toLowerCase();
+      // Strip prep phrases
+      n = n.replace(prepRegex, '');
+      // Strip leading/trailing commas, dashes, whitespace
+      n = n.replace(/^[\s,\-]+|[\s,\-]+$/g, '');
+      // Collapse internal whitespace
+      n = n.replace(/\s{2,}/g, ' ');
+      // Normalise plurals (apply first matching rule to each word)
+      n = n.split(' ').map(word => {
+        for (const [pattern, replacement] of pluralRules) {
+          if (pattern.test(word)) return word.replace(pattern, replacement);
+        }
+        return word;
+      }).join(' ');
+      return n.trim();
+    }
+
+    // Aggregate by (normalised name, canonical unit)
     const ingMap = new Map();
     for (const row of ingRows) {
-      const key = `${row.name.toLowerCase()}||${row.unit || ''}`;
+      const { canonical, factor } = normaliseUnit(row.unit);
+      const normName = normaliseIngredientName(row.name);
+      const key = `${normName}||${canonical}`;
       const hasQty = row.quantity != null && parseFloat(row.quantity) > 0;
       const rawQty = hasQty ? parseFloat(row.quantity) : null;
       const recipeServings = parseFloat(row.recipe_servings) || 1;
       const mealPlanServings = parseFloat(row.servings) || 1;
-      const scaledQty = rawQty != null ? rawQty * (mealPlanServings / recipeServings) : null;
+      const scaledQty = rawQty != null ? rawQty * factor * (mealPlanServings / recipeServings) : null;
       const dateStr2 = typeof row.date === 'string' ? row.date.slice(0, 10) : row.date.toISOString().slice(0, 10);
       const localDate = new Date(dateStr2 + 'T00:00:00');
       const use = {
@@ -222,8 +313,8 @@ app.get('/shopping-list', authenticateToken, async (req, res) => {
       } else {
         ingMap.set(key, {
           name: row.name,
-          totalQuantity: scaledQty,   // null if no numeric quantity
-          unit: row.unit || '',
+          totalQuantity: scaledQty,   // null if no numeric quantity (in canonical units)
+          canonicalUnit: canonical,
           section: row.section || 'Ingredients',
           uses: [use],
         });
@@ -231,11 +322,17 @@ app.get('/shopping-list', authenticateToken, async (req, res) => {
     }
 
     const ingredients = Array.from(ingMap.values())
-      .map(entry => ({
-        ...entry,
-        totalQuantity: entry.totalQuantity != null ? Math.round(entry.totalQuantity * 100) / 100 : null,
-        multipleUses: entry.uses.length > 1,
-      }))
+      .map(entry => {
+        const { quantity: displayQty, unit: displayUnit } = readableQuantity(entry.totalQuantity, entry.canonicalUnit);
+        return {
+          name: entry.name,
+          totalQuantity: displayQty,
+          unit: displayUnit,
+          section: entry.section,
+          uses: entry.uses,
+          multipleUses: entry.uses.length > 1,
+        };
+      })
       .sort((a, b) => a.name.localeCompare(b.name));
 
     res.json({ week: startStr, meals, totals, ingredients });
@@ -391,7 +488,7 @@ app.get('/profile', authenticateToken, async (req, res) => {
     const { rows } = await db.query(
       `SELECT up.user_id, up.date_of_birth, up.sex, up.height_cm, up.activity_level,
               up.goal, up.goal_pace, up.protein_pct, up.carbs_pct, up.fat_pct,
-              up.weight_unit, up.height_unit, up.updated_at,
+              up.dietary_requirement, up.weight_unit, up.height_unit, up.updated_at,
               dl.weight_kg AS latest_weight_kg
        FROM users u
        LEFT JOIN user_profiles up ON up.user_id = u.id
@@ -424,13 +521,14 @@ app.put('/profile', authenticateToken, async (req, res) => {
       protein_pct,
       carbs_pct,
       fat_pct,
+      dietary_requirement,
       weight_unit,
       height_unit,
     } = req.body;
     const { rows } = await db.query(
       `INSERT INTO user_profiles
-         (user_id, date_of_birth, sex, height_cm, activity_level, goal, goal_pace, protein_pct, carbs_pct, fat_pct, weight_unit, height_unit, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW())
+         (user_id, date_of_birth, sex, height_cm, activity_level, goal, goal_pace, protein_pct, carbs_pct, fat_pct, dietary_requirement, weight_unit, height_unit, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW())
        ON CONFLICT (user_id) DO UPDATE SET
          date_of_birth  = EXCLUDED.date_of_birth,
          sex            = EXCLUDED.sex,
@@ -441,6 +539,7 @@ app.put('/profile', authenticateToken, async (req, res) => {
          protein_pct    = EXCLUDED.protein_pct,
          carbs_pct      = EXCLUDED.carbs_pct,
          fat_pct        = EXCLUDED.fat_pct,
+         dietary_requirement = EXCLUDED.dietary_requirement,
          weight_unit    = EXCLUDED.weight_unit,
          height_unit    = EXCLUDED.height_unit,
          updated_at     = NOW()
@@ -456,6 +555,7 @@ app.put('/profile', authenticateToken, async (req, res) => {
         protein_pct ?? 30,
         carbs_pct ?? 40,
         fat_pct ?? 30,
+        dietary_requirement || null,
         weight_unit || 'kg',
         height_unit || 'cm',
       ]
@@ -510,19 +610,44 @@ app.post('/logs/daily', authenticateToken, async (req, res) => {
 // List recipes
 app.get('/recipes', async (req, res) => {
   try {
-    const { category, search, tags } = req.query;
-    let query = `SELECT id, title, description, servings, prep_time_mins, cook_time_mins,
-                        category, dietary_tags, calories_per_serving, protein_per_serving,
-                        carbs_per_serving, fat_per_serving, status, source_url, created_at
-                 FROM recipes WHERE 1=1`;
+    const { category, search, tags, ingredient } = req.query;
+    let query = `SELECT DISTINCT r.id, r.title, r.description, r.servings, r.prep_time_mins, r.cook_time_mins,
+                        r.category, r.dietary_tags, r.calories_per_serving, r.protein_per_serving,
+                        r.carbs_per_serving, r.fat_per_serving, r.status, r.source_url, r.created_at
+                 FROM recipes r`;
     const params = [];
-    if (category) { params.push(category); query += ` AND category = $${params.length}`; }
-    if (search) { params.push(`%${search.toLowerCase()}%`); query += ` AND LOWER(title) LIKE $${params.length}`; }
-    query += ' ORDER BY created_at DESC';
+    if (ingredient) {
+      query += ` JOIN recipe_ingredients ri ON ri.recipe_id = r.id`;
+    }
+    query += ` WHERE 1=1`;
+    if (category) { params.push(category); query += ` AND r.category = $${params.length}`; }
+    if (search) { params.push(`%${search.toLowerCase()}%`); query += ` AND LOWER(r.title) LIKE $${params.length}`; }
+    if (ingredient) { params.push(`%${ingredient.toLowerCase()}%`); query += ` AND LOWER(ri.name) LIKE $${params.length}`; }
+    query += ' ORDER BY r.created_at DESC';
     const { rows } = await db.query(query, params);
     res.json(rows);
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch recipes', details: err.message });
+  }
+});
+
+// Batch average ratings for all recipes (avoids N+1)
+app.get('/recipes/ratings', async (req, res) => {
+  try {
+    const { rows } = await db.query(
+      `SELECT recipe_id,
+              COUNT(*)::int AS count,
+              ROUND(AVG(rating)::numeric, 1)::float AS average_rating
+       FROM recipe_reviews
+       GROUP BY recipe_id`
+    );
+    const ratings = {};
+    for (const r of rows) {
+      ratings[r.recipe_id] = { average_rating: r.average_rating, count: r.count };
+    }
+    res.json(ratings);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch ratings', details: err.message });
   }
 });
 
@@ -697,13 +822,19 @@ function parseDietaryTags(keywords, category) {
 function parseIngredient(str) {
   if (!str) return { quantity: null, unit: null, name: str };
   // Normalise unicode fractions
-  const s = str.trim()
+  let s = str.trim()
     .replace(/½/g, '0.5').replace(/¼/g, '0.25').replace(/¾/g, '0.75')
     .replace(/⅓/g, '0.333').replace(/⅔/g, '0.667');
 
+  // Fix stuck number+unit patterns: "400g" → "400 g", "250ml" → "250 ml", "1small" → "1 small"
+  s = s.replace(/^(\d+(?:\.\d+)?)(g|kg|ml|l|oz|lb|lbs|cup|cups|tbsp|tsp|can|cans|tin|tins)\b/i, '$1 $2');
+  // Fix stuck number+word: "1small" → "1 small"
+  s = s.replace(/^(\d+(?:\.\d+)?)([a-zA-Z])/, '$1 $2');
+
   const UNITS = ['g','kg','ml','l','oz','lb','lbs','cup','cups','tbsp','tsp','tablespoon',
                  'tablespoons','teaspoon','teaspoons','piece','pieces','clove','cloves',
-                 'slice','slices','bunch','handful','pinch','can','cans','tin','tins'];
+                 'slice','slices','bunch','handful','pinch','can','cans','tin','tins',
+                 'pouch','packet','bag','jar','bottle'];
 
   const tokens = s.split(/\s+/);
   let quantity = null;
@@ -725,9 +856,21 @@ function parseIngredient(str) {
     nameStart = 1;
   }
 
-  if (nameStart < tokens.length && UNITS.includes(tokens[nameStart].toLowerCase())) {
-    unit = tokens[nameStart].toLowerCase();
-    nameStart++;
+  // Check for unit — also handle "400g" patterns where unit is attached to a number in subsequent tokens
+  if (nameStart < tokens.length) {
+    const nextToken = tokens[nameStart].toLowerCase();
+    if (UNITS.includes(nextToken)) {
+      unit = nextToken;
+      nameStart++;
+    } else {
+      // Check for "NNNunit" pattern in the token (e.g., "400g")
+      const attached = nextToken.match(/^(\d+(?:\.\d+)?)(g|kg|ml|l|oz|lb|lbs)$/i);
+      if (attached && quantity == null) {
+        quantity = parseFloat(attached[1]);
+        unit = attached[2].toLowerCase();
+        nameStart++;
+      }
+    }
   }
 
   const name = tokens.slice(nameStart).join(' ').replace(/^,\s*/, '') || str;
@@ -744,18 +887,57 @@ function parseIngredientRefs(instruction, ingredients) {
   const refs = [];
   const seen = new Set();
 
+  // Common cooking/recipe words that should never match as ingredient identifiers
+  const STOP_WORDS = new Set([
+    'about','with','from','into','over','onto','until','after','before',
+    'through','around','between','under','above','below','along','across',
+    'each','every','some','more','most','other','another','such','than',
+    'well','then','just','also','very','often','still','even','back',
+    'only','made','make','will','been','being','have','were','does',
+    'this','that','they','them','their','what','when','which','where',
+    'would','could','should','these','those','while','there','here',
+    'serve','served','serving','cook','cooked','cooking','bake','baked',
+    'heat','heated','leave','warm','cool','cold','rest','apart','keep',
+    'chop','chopped','dice','diced','mince','minced','grate','grated',
+    'finely','roughly','thinly','thickly','fresh','dried','large','small',
+    'medium','thick','thin','long','half','whole','full','good','nice',
+    'skinless','boneless','strips','strip','fingers','finger','pieces',
+    'alternatively','minutes','sauce','spaced','arrange','arranged',
+    'cover','covered','place','placed','remove','removed','pour','stir',
+    'stirring','mixing','mixed','coating','coated','coat',
+    'cut','cuts','slice','sliced','side','sides',
+  ]);
+
   for (const ing of ingredients) {
     if (seen.has(ing.id)) continue;
 
-    // Build candidate match terms: full name, then each word >3 chars (avoids "the","and" etc)
+    // Extract the core ingredient name — strip parenthetical notes and prep instructions
     const nameLower = ing.name.toLowerCase().trim();
-    const words = nameLower.split(/\s+/).filter(w => w.length > 3);
-    const candidates = [nameLower, ...words];
+    // Remove parenthetical content like "(about 300g)" or "(without palm oil)"
+    const nameClean = nameLower.replace(/\(.*?\)/g, '').trim();
+    // Remove trailing prep instructions after common indicators
+    const coreName = nameClean.replace(/,?\s*(cut |finely |roughly |thinly |to serve|to taste).*$/i, '').trim();
+
+    // Build candidate match terms:
+    // 1. Full cleaned name
+    // 2. Individual words that are meaningful (>4 chars, not stop words, not units)
+    const words = coreName.split(/\s+/).filter(w =>
+      w.length > 4 &&
+      !STOP_WORDS.has(w) &&
+      !UNITS.includes(w) &&
+      !/^\d/.test(w)
+    );
+    const candidates = [coreName];
+    if (coreName !== nameLower) candidates.push(nameLower);
+    // Only add individual words if they're specific enough (>5 chars and not generic)
+    candidates.push(...words.filter(w => w.length > 5));
 
     let foundIdx = -1;
     for (const candidate of candidates) {
-      const idx = text.indexOf(candidate);
-      if (idx !== -1) { foundIdx = idx; break; }
+      // Use word boundary matching to avoid partial matches
+      const re = new RegExp('\\b' + candidate.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b');
+      const match = text.match(re);
+      if (match) { foundIdx = match.index; break; }
     }
     if (foundIdx === -1) continue;
 
@@ -934,6 +1116,73 @@ app.post('/recipes/import', authenticateToken, async (req, res) => {
   }
 });
 
+// ── Recipe Reviews ───────────────────────────────────────────────────────────
+
+// Get reviews for a recipe (with username)
+app.get('/recipes/:id/reviews', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { rows } = await db.query(
+      `SELECT rr.id, rr.recipe_id, rr.user_id, rr.rating, rr.comment,
+              rr.created_at, rr.updated_at, u.username
+       FROM recipe_reviews rr
+       JOIN users u ON u.id = rr.user_id
+       WHERE rr.recipe_id = $1
+       ORDER BY rr.created_at DESC`,
+      [id]
+    );
+    // Also compute average rating
+    const avg = rows.length > 0
+      ? parseFloat((rows.reduce((s, r) => s + r.rating, 0) / rows.length).toFixed(1))
+      : null;
+    res.json({ reviews: rows, average_rating: avg, count: rows.length });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch reviews', details: err.message });
+  }
+});
+
+// Add or update a review (one per user per recipe)
+app.post('/recipes/:id/reviews', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { rating, comment } = req.body;
+    if (!rating || rating < 1 || rating > 5) {
+      return res.status(400).json({ error: 'rating must be between 1 and 5' });
+    }
+    // Verify recipe exists
+    const { rows: recipe } = await db.query('SELECT id FROM recipes WHERE id = $1', [id]);
+    if (recipe.length === 0) return res.status(404).json({ error: 'Recipe not found' });
+
+    const { rows } = await db.query(
+      `INSERT INTO recipe_reviews (recipe_id, user_id, rating, comment)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (recipe_id, user_id) DO UPDATE SET
+         rating = EXCLUDED.rating,
+         comment = EXCLUDED.comment,
+         updated_at = NOW()
+       RETURNING *`,
+      [id, req.user.id, rating, comment || null]
+    );
+    res.status(201).json(rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to save review', details: err.message });
+  }
+});
+
+// Delete own review
+app.delete('/recipes/:id/reviews', authenticateToken, async (req, res) => {
+  try {
+    const { rows } = await db.query(
+      'DELETE FROM recipe_reviews WHERE recipe_id = $1 AND user_id = $2 RETURNING *',
+      [req.params.id, req.user.id]
+    );
+    if (rows.length === 0) return res.status(404).json({ error: 'Review not found' });
+    res.sendStatus(204);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to delete review', details: err.message });
+  }
+});
+
 // Re-parse ingredient refs for an existing recipe (e.g. after editing ingredients)
 app.post('/recipes/:id/reparse-steps', authenticateToken, async (req, res) => {
   try {
@@ -947,6 +1196,495 @@ app.post('/recipes/:id/reparse-steps', authenticateToken, async (req, res) => {
     res.json({ steps });
   } catch (err) {
     res.status(500).json({ error: 'Failed to reparse steps', details: err.message });
+  }
+});
+
+// ── Meal plan templates ──────────────────────────────────────────────────────
+
+// List user's templates
+app.get('/meal-plan-templates', authenticateToken, async (req, res) => {
+  try {
+    const { rows } = await db.query(
+      'SELECT id, name, created_at FROM meal_plan_templates WHERE user_id = $1 ORDER BY created_at DESC',
+      [req.user.id]
+    );
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch templates', details: err.message });
+  }
+});
+
+// Save a week as a template
+app.post('/meal-plan-templates', authenticateToken, async (req, res) => {
+  try {
+    const { name, slots } = req.body;
+    if (!name || !slots || !Array.isArray(slots) || slots.length === 0) {
+      return res.status(400).json({ error: 'name and slots[] are required' });
+    }
+    const { rows } = await db.query(
+      'INSERT INTO meal_plan_templates (user_id, name, slots) VALUES ($1, $2, $3) RETURNING id, name, created_at',
+      [req.user.id, name.trim(), JSON.stringify(slots)]
+    );
+    res.json(rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to save template', details: err.message });
+  }
+});
+
+// Apply a template to a target week
+app.post('/meal-plan-templates/:id/apply', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { weekStart } = req.body;
+    if (!weekStart) return res.status(400).json({ error: 'weekStart is required' });
+
+    const { rows } = await db.query(
+      'SELECT slots FROM meal_plan_templates WHERE id = $1 AND user_id = $2',
+      [id, req.user.id]
+    );
+    if (rows.length === 0) return res.status(404).json({ error: 'Template not found' });
+
+    const slots = rows[0].slots;
+    const baseDate = new Date(weekStart + 'T00:00:00');
+
+    for (const slot of slots) {
+      const d = new Date(baseDate);
+      d.setDate(d.getDate() + slot.day_offset);
+      const dateStr = d.toISOString().slice(0, 10);
+
+      if (slot.recipe_id) {
+        await db.query(
+          `INSERT INTO meal_plans (user_id, date, meal_type, recipe_id, servings, last_updated)
+           VALUES ($1, $2, $3, $4, $5, NOW())
+           ON CONFLICT (user_id, date, meal_type)
+           DO UPDATE SET meal_id = NULL, recipe_id = EXCLUDED.recipe_id, servings = EXCLUDED.servings, last_updated = NOW()`,
+          [req.user.id, dateStr, slot.meal_type, slot.recipe_id, slot.servings || 1]
+        );
+      } else if (slot.meal_id) {
+        await db.query(
+          `INSERT INTO meal_plans (user_id, date, meal_type, meal_id, servings, last_updated)
+           VALUES ($1, $2, $3, $4, $5, NOW())
+           ON CONFLICT (user_id, date, meal_type)
+           DO UPDATE SET recipe_id = NULL, meal_id = EXCLUDED.meal_id, servings = EXCLUDED.servings, last_updated = NOW()`,
+          [req.user.id, dateStr, slot.meal_type, slot.meal_id, slot.servings || 1]
+        );
+      }
+    }
+
+    res.json({ success: true, applied: slots.length });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to apply template', details: err.message });
+  }
+});
+
+// Delete a template
+app.delete('/meal-plan-templates/:id', authenticateToken, async (req, res) => {
+  try {
+    const { rowCount } = await db.query(
+      'DELETE FROM meal_plan_templates WHERE id = $1 AND user_id = $2',
+      [req.params.id, req.user.id]
+    );
+    if (rowCount === 0) return res.status(404).json({ error: 'Template not found' });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to delete template', details: err.message });
+  }
+});
+
+// ── Workout Tracking ──────────────────────────────────────────────
+
+// List exercises (optional ?category= filter)
+app.get('/exercises', async (req, res) => {
+  try {
+    const { category } = req.query;
+    let query = 'SELECT * FROM exercises ORDER BY name';
+    let params = [];
+    if (category) {
+      query = 'SELECT * FROM exercises WHERE category = $1 ORDER BY name';
+      params.push(category);
+    }
+    const { rows } = await db.query(query, params);
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch exercises', details: err.message });
+  }
+});
+
+// Create exercise
+app.post('/exercises', authenticateToken, async (req, res) => {
+  try {
+    const { name, category, muscle_groups } = req.body;
+    if (!name) return res.status(400).json({ error: 'name is required' });
+    const { rows } = await db.query(
+      'INSERT INTO exercises (name, category, muscle_groups) VALUES ($1, $2, $3) RETURNING *',
+      [name, category || null, muscle_groups || []]
+    );
+    res.status(201).json(rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to create exercise', details: err.message });
+  }
+});
+
+// List user's workout logs (with sets), optional ?from=&to= date range
+app.get('/workouts', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { from, to } = req.query;
+    let dateFilter = '';
+    const params = [userId];
+    if (from && to) {
+      dateFilter = ' AND wl.date BETWEEN $2 AND $3';
+      params.push(from, to);
+    }
+    const { rows: logs } = await db.query(
+      `SELECT wl.id, wl.date, wl.name, wl.notes, wl.created_at
+       FROM workout_logs wl
+       WHERE wl.user_id = $1${dateFilter}
+       ORDER BY wl.date DESC, wl.created_at DESC`,
+      params
+    );
+    if (logs.length === 0) return res.json([]);
+    const logIds = logs.map(l => l.id);
+    const { rows: sets } = await db.query(
+      `SELECT ws.*, e.name AS exercise_name, e.category AS exercise_category
+       FROM workout_sets ws
+       LEFT JOIN exercises e ON ws.exercise_id = e.id
+       WHERE ws.workout_log_id = ANY($1)
+       ORDER BY ws.workout_log_id, ws.set_number`,
+      [logIds]
+    );
+    const setsByLog = {};
+    for (const s of sets) {
+      if (!setsByLog[s.workout_log_id]) setsByLog[s.workout_log_id] = [];
+      setsByLog[s.workout_log_id].push(s);
+    }
+    const result = logs.map(l => ({ ...l, sets: setsByLog[l.id] || [] }));
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch workouts', details: err.message });
+  }
+});
+
+// Create workout log with sets
+app.post('/workouts', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { date, name, notes, sets } = req.body;
+    if (!date) return res.status(400).json({ error: 'date is required' });
+    const { rows } = await db.query(
+      'INSERT INTO workout_logs (user_id, date, name, notes) VALUES ($1, $2, $3, $4) RETURNING *',
+      [userId, date, name || null, notes || null]
+    );
+    const log = rows[0];
+    if (sets && sets.length > 0) {
+      for (const s of sets) {
+        await db.query(
+          `INSERT INTO workout_sets (workout_log_id, exercise_id, set_number, reps, weight_kg, duration_secs, distance_m)
+           VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+          [log.id, s.exercise_id, s.set_number, s.reps || null, s.weight_kg || null, s.duration_secs || null, s.distance_m || null]
+        );
+      }
+    }
+    // Return the full log with sets
+    const { rows: allSets } = await db.query(
+      `SELECT ws.*, e.name AS exercise_name, e.category AS exercise_category
+       FROM workout_sets ws LEFT JOIN exercises e ON ws.exercise_id = e.id
+       WHERE ws.workout_log_id = $1 ORDER BY ws.set_number`,
+      [log.id]
+    );
+    res.status(201).json({ ...log, sets: allSets });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to create workout', details: err.message });
+  }
+});
+
+// Delete own workout
+app.delete('/workouts/:id', authenticateToken, async (req, res) => {
+  try {
+    const { rowCount } = await db.query(
+      'DELETE FROM workout_logs WHERE id = $1 AND user_id = $2',
+      [req.params.id, req.user.id]
+    );
+    if (rowCount === 0) return res.status(404).json({ error: 'Workout not found' });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to delete workout', details: err.message });
+  }
+});
+
+// List user's workout templates
+app.get('/workout-templates', authenticateToken, async (req, res) => {
+  try {
+    const { rows } = await db.query(
+      'SELECT * FROM workout_templates WHERE user_id = $1 ORDER BY created_at DESC',
+      [req.user.id]
+    );
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch workout templates', details: err.message });
+  }
+});
+
+// Save workout template
+app.post('/workout-templates', authenticateToken, async (req, res) => {
+  try {
+    const { name, exercises } = req.body;
+    if (!name || !exercises) return res.status(400).json({ error: 'name and exercises are required' });
+    const { rows } = await db.query(
+      'INSERT INTO workout_templates (user_id, name, exercises) VALUES ($1, $2, $3) RETURNING *',
+      [req.user.id, name, JSON.stringify(exercises)]
+    );
+    res.status(201).json(rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to save workout template', details: err.message });
+  }
+});
+
+// Delete workout template
+app.delete('/workout-templates/:id', authenticateToken, async (req, res) => {
+  try {
+    const { rowCount } = await db.query(
+      'DELETE FROM workout_templates WHERE id = $1 AND user_id = $2',
+      [req.params.id, req.user.id]
+    );
+    if (rowCount === 0) return res.status(404).json({ error: 'Template not found' });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to delete workout template', details: err.message });
+  }
+});
+
+// ── Strava Integration ───────────────────────────────────────────────
+
+const STRAVA_CLIENT_ID = process.env.STRAVA_CLIENT_ID;
+const STRAVA_CLIENT_SECRET = process.env.STRAVA_CLIENT_SECRET;
+const STRAVA_REDIRECT_URI = process.env.STRAVA_REDIRECT_URI || 'http://localhost/api/strava/callback';
+
+// Helper: refresh Strava access token if expired
+async function refreshStravaToken(conn) {
+  if (Date.now() / 1000 < conn.expires_at - 60) return conn; // still valid
+  try {
+    const resp = await fetch('https://www.strava.com/oauth/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        client_id: STRAVA_CLIENT_ID,
+        client_secret: STRAVA_CLIENT_SECRET,
+        grant_type: 'refresh_token',
+        refresh_token: conn.refresh_token,
+      }),
+    });
+    if (!resp.ok) throw new Error('Strava token refresh failed');
+    const data = await resp.json();
+    await db.query(
+      `UPDATE strava_connections SET access_token = $1, refresh_token = $2, expires_at = $3 WHERE user_id = $4`,
+      [data.access_token, data.refresh_token, data.expires_at, conn.user_id]
+    );
+    return { ...conn, access_token: data.access_token, refresh_token: data.refresh_token, expires_at: data.expires_at };
+  } catch (err) {
+    console.error('[strava] Token refresh error:', err.message);
+    throw err;
+  }
+}
+
+// Map Strava activity type to exercise name
+function stravaTypeToExercise(type) {
+  const map = {
+    Run: 'Running',
+    Ride: 'Cycling',
+    Swim: 'Swimming',
+    Walk: 'Walking',
+    Hike: 'Walking',
+    VirtualRide: 'Cycling',
+    VirtualRun: 'Running',
+  };
+  return map[type] || null;
+}
+
+// GET /strava/auth-url — returns the Strava OAuth authorization URL
+app.get('/strava/auth-url', authenticateToken, (req, res) => {
+  if (!STRAVA_CLIENT_ID) {
+    return res.json({ available: false });
+  }
+  const url = `https://www.strava.com/oauth/authorize?client_id=${STRAVA_CLIENT_ID}&response_type=code&redirect_uri=${encodeURIComponent(STRAVA_REDIRECT_URI)}&scope=activity:read_all&state=${req.user.id}`;
+  res.json({ available: true, url });
+});
+
+// GET /strava/callback — handles OAuth callback from Strava
+app.get('/strava/callback', async (req, res) => {
+  const { code, state } = req.query;
+  const userId = Number(state);
+  if (!code || !userId) {
+    return res.redirect('/workouts?strava=error');
+  }
+  try {
+    const resp = await fetch('https://www.strava.com/oauth/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        client_id: STRAVA_CLIENT_ID,
+        client_secret: STRAVA_CLIENT_SECRET,
+        code,
+        grant_type: 'authorization_code',
+      }),
+    });
+    if (!resp.ok) {
+      console.error('[strava] Token exchange failed:', resp.status);
+      return res.redirect('/workouts?strava=error');
+    }
+    const data = await resp.json();
+    await db.query(
+      `INSERT INTO strava_connections (user_id, strava_athlete_id, access_token, refresh_token, expires_at)
+       VALUES ($1, $2, $3, $4, $5)
+       ON CONFLICT (user_id) DO UPDATE SET
+         strava_athlete_id = EXCLUDED.strava_athlete_id,
+         access_token = EXCLUDED.access_token,
+         refresh_token = EXCLUDED.refresh_token,
+         expires_at = EXCLUDED.expires_at`,
+      [userId, data.athlete?.id, data.access_token, data.refresh_token, data.expires_at]
+    );
+    res.redirect('/workouts?strava=connected');
+  } catch (err) {
+    console.error('[strava] Callback error:', err.message);
+    res.redirect('/workouts?strava=error');
+  }
+});
+
+// GET /strava/status — returns connection status for current user
+app.get('/strava/status', authenticateToken, async (req, res) => {
+  if (!STRAVA_CLIENT_ID) {
+    return res.json({ available: false, connected: false });
+  }
+  try {
+    const { rows } = await db.query(
+      'SELECT strava_athlete_id, created_at FROM strava_connections WHERE user_id = $1',
+      [req.user.id]
+    );
+    res.json({
+      available: true,
+      connected: rows.length > 0,
+      athlete_id: rows[0]?.strava_athlete_id || null,
+      connected_at: rows[0]?.created_at || null,
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to check Strava status', details: err.message });
+  }
+});
+
+// POST /strava/sync — fetches recent activities from Strava and imports as workout_logs
+app.post('/strava/sync', authenticateToken, async (req, res) => {
+  try {
+    const { rows: connRows } = await db.query(
+      'SELECT * FROM strava_connections WHERE user_id = $1',
+      [req.user.id]
+    );
+    if (connRows.length === 0) {
+      return res.status(400).json({ error: 'Strava not connected' });
+    }
+
+    let conn = connRows[0];
+    conn = await refreshStravaToken(conn);
+
+    // Fetch last 30 days of activities
+    const after = Math.floor(Date.now() / 1000) - 30 * 24 * 60 * 60;
+    const activitiesResp = await fetch(
+      `https://www.strava.com/api/v3/athlete/activities?after=${after}&per_page=100`,
+      { headers: { Authorization: `Bearer ${conn.access_token}` } }
+    );
+    if (!activitiesResp.ok) {
+      const errText = await activitiesResp.text();
+      console.error('[strava] Activities fetch failed:', activitiesResp.status, errText);
+      return res.status(502).json({ error: 'Failed to fetch Strava activities' });
+    }
+    const activities = await activitiesResp.json();
+
+    let imported = 0;
+    let skipped = 0;
+    let stepsTotal = 0;
+    const dailySteps = {}; // date -> estimated steps
+
+    for (const act of activities) {
+      // Skip already imported
+      const existing = await db.query(
+        'SELECT id FROM workout_logs WHERE user_id = $1 AND strava_activity_id = $2',
+        [req.user.id, act.id]
+      );
+      if (existing.rows.length > 0) {
+        skipped++;
+        continue;
+      }
+
+      // Determine exercise
+      const exerciseName = stravaTypeToExercise(act.type);
+      let exerciseId = null;
+      if (exerciseName) {
+        const exRow = await db.query('SELECT id FROM exercises WHERE name = $1', [exerciseName]);
+        if (exRow.rows.length > 0) {
+          exerciseId = exRow.rows[0].id;
+        }
+      }
+      // Fallback: use HIIT for unmapped types
+      if (!exerciseId) {
+        const exRow = await db.query("SELECT id FROM exercises WHERE name = 'HIIT'");
+        if (exRow.rows.length > 0) exerciseId = exRow.rows[0].id;
+      }
+
+      const actDate = act.start_date_local ? act.start_date_local.slice(0, 10) : act.start_date.slice(0, 10);
+      const durationSecs = Math.round(act.moving_time || act.elapsed_time || 0);
+      const distanceM = act.distance ? Math.round(act.distance) : null;
+
+      // Create workout_log
+      const { rows: logRows } = await db.query(
+        `INSERT INTO workout_logs (user_id, date, name, notes, strava_activity_id)
+         VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+        [req.user.id, actDate, act.name || act.type, `Imported from Strava (${act.type})`, act.id]
+      );
+      const logId = logRows[0].id;
+
+      // Create workout_set
+      if (exerciseId) {
+        await db.query(
+          `INSERT INTO workout_sets (workout_log_id, exercise_id, set_number, duration_secs, distance_m)
+           VALUES ($1, $2, 1, $3, $4)`,
+          [logId, exerciseId, durationSecs, distanceM]
+        );
+      }
+
+      // Estimate steps for walking/running activities (~1300 steps per km)
+      if (['Run', 'Walk', 'Hike', 'VirtualRun'].includes(act.type) && distanceM) {
+        const steps = Math.round((distanceM / 1000) * 1300);
+        dailySteps[actDate] = (dailySteps[actDate] || 0) + steps;
+        stepsTotal += steps;
+      }
+
+      imported++;
+    }
+
+    // Update daily_logs with estimated steps
+    for (const [dateStr, steps] of Object.entries(dailySteps)) {
+      await db.query(
+        `INSERT INTO daily_logs (user_id, date, steps)
+         VALUES ($1, $2, $3)
+         ON CONFLICT (user_id, date)
+         DO UPDATE SET steps = COALESCE(daily_logs.steps, 0) + $3`,
+        [req.user.id, dateStr, steps]
+      );
+    }
+
+    res.json({ imported, skipped, estimated_steps: stepsTotal });
+  } catch (err) {
+    console.error('[strava] Sync error:', err.message);
+    res.status(500).json({ error: 'Strava sync failed', details: err.message });
+  }
+});
+
+// DELETE /strava/disconnect — removes the connection
+app.delete('/strava/disconnect', authenticateToken, async (req, res) => {
+  try {
+    await db.query('DELETE FROM strava_connections WHERE user_id = $1', [req.user.id]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to disconnect Strava', details: err.message });
   }
 });
 

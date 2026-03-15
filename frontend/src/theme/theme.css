@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+/* Enable class-based dark mode for Tailwind v4 */
+@custom-variant dark (&:where(.dark, .dark *));
+
 /* FullCalendar overrides */
 .fc {
   background: #fff;
@@ -22,4 +25,20 @@
 
 .fc-button:hover {
   background: #3b82f6;
+}
+
+/* FullCalendar dark mode overrides */
+.dark .fc {
+  background: #1e293b;
+  color: #e2e8f0;
+}
+
+.dark .fc-toolbar-title {
+  color: #e2e8f0;
+}
+
+.dark .fc-theme-standard td,
+.dark .fc-theme-standard th,
+.dark .fc-theme-standard .fc-scrollgrid {
+  border-color: #334155;
 }

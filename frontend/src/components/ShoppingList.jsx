@@ -62,7 +62,9 @@ function buildClipboardText(weekStart, mealsGrouped, totals) {
 
 function formatQty(n) {
   if (n === null || n === undefined) return '';
-  return Number.isInteger(n) ? String(n) : String(parseFloat(n.toFixed(2)));
+  const num = Number(n);
+  if (isNaN(num)) return String(n);
+  return Number.isInteger(num) ? String(num) : String(parseFloat(num.toFixed(2)));
 }
 
 // ── Active Shopping Trip View ─────────────────────────────────────────────────
@@ -340,7 +342,49 @@ const ShoppingList = () => {
   }
 
   if (checkingTrip) {
-    return <div className="text-center py-12 text-slate-500 text-sm">Loading...</div>;
+    return (
+      <div className="max-w-3xl mx-auto">
+        <div className="animate-pulse space-y-6">
+          <div className="flex items-center justify-between">
+            <div className="space-y-2">
+              <div className="h-7 bg-slate-200 rounded w-48" />
+              <div className="h-4 bg-slate-200 rounded w-36" />
+            </div>
+            <div className="flex gap-2">
+              <div className="h-10 w-10 bg-slate-200 rounded-lg" />
+              <div className="h-10 w-10 bg-slate-200 rounded-lg" />
+            </div>
+          </div>
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 space-y-3">
+            <div className="h-4 bg-slate-200 rounded w-32" />
+            <div className="grid grid-cols-4 gap-3">
+              {[...Array(4)].map((_, i) => (
+                <div key={i} className="text-center space-y-2">
+                  <div className="h-6 bg-slate-200 rounded w-16 mx-auto" />
+                  <div className="h-3 bg-slate-200 rounded w-10 mx-auto" />
+                </div>
+              ))}
+            </div>
+          </div>
+          {[...Array(3)].map((_, i) => (
+            <div key={i} className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+              <div className="px-4 py-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+                <div className="h-4 bg-slate-200 rounded w-40" />
+                <div className="h-3 bg-slate-200 rounded w-16" />
+              </div>
+              <div className="divide-y divide-slate-50">
+                {[...Array(2)].map((_, j) => (
+                  <div key={j} className="flex items-center gap-3 px-4 py-3">
+                    <div className="h-5 w-16 bg-slate-200 rounded-full" />
+                    <div className="h-4 bg-slate-200 rounded w-3/4" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
   }
 
   const mealsGrouped = groupedByDay();
@@ -390,35 +434,60 @@ const ShoppingList = () => {
 
       {/* Loading */}
       {loading && (
-        <div className="text-center py-12 text-slate-500 text-sm">Loading...</div>
+        <div className="animate-pulse space-y-4">
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 space-y-3">
+            <div className="h-4 bg-slate-200 rounded w-32" />
+            <div className="grid grid-cols-4 gap-3">
+              {[...Array(4)].map((_, i) => (
+                <div key={i} className="text-center space-y-2">
+                  <div className="h-6 bg-slate-200 rounded w-16 mx-auto" />
+                  <div className="h-3 bg-slate-200 rounded w-10 mx-auto" />
+                </div>
+              ))}
+            </div>
+          </div>
+          {[...Array(3)].map((_, i) => (
+            <div key={i} className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+              <div className="px-4 py-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+                <div className="h-4 bg-slate-200 rounded w-40" />
+                <div className="h-3 bg-slate-200 rounded w-16" />
+              </div>
+              <div className="divide-y divide-slate-50">
+                {[...Array(2)].map((_, j) => (
+                  <div key={j} className="flex items-center gap-3 px-4 py-3">
+                    <div className="h-5 w-16 bg-slate-200 rounded-full" />
+                    <div className="h-4 bg-slate-200 rounded w-3/4" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
       )}
 
       {!loading && data && (
         <>
-          {/* Weekly macro summary card */}
+          {/* Action buttons — top of page */}
           {hasMeals && (
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 mb-6">
-              <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-3">
-                Weekly Totals
-              </h2>
-              <div className="grid grid-cols-4 gap-3">
-                <div className="text-center">
-                  <p className="text-xl font-bold text-slate-800">{data.totals.calories}</p>
-                  <p className="text-xs text-slate-500">kcal</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-xl font-bold text-blue-600">{data.totals.protein_g}g</p>
-                  <p className="text-xs text-slate-500">Protein</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-xl font-bold text-amber-600">{data.totals.carbs_g}g</p>
-                  <p className="text-xs text-slate-500">Carbs</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-xl font-bold text-red-500">{data.totals.fat_g}g</p>
-                  <p className="text-xs text-slate-500">Fat</p>
-                </div>
-              </div>
+            <div className="flex justify-end gap-3 mb-4">
+              <button
+                onClick={handleCopy}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-sm font-medium transition-colors"
+              >
+                {copied ? 'Copied!' : 'Copy to clipboard'}
+              </button>
+              {hasIngredients && (
+                <button
+                  onClick={handleSaveForShopping}
+                  disabled={savingTrip}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white text-sm font-semibold transition-colors"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 0 0-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 0 0-16.536-1.84M7.5 14.25 5.106 5.272M6 20.25a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Zm12.75 0a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Z" />
+                  </svg>
+                  {savingTrip ? 'Saving...' : 'Save for Shopping'}
+                </button>
+              )}
             </div>
           )}
 
@@ -468,13 +537,13 @@ const ShoppingList = () => {
                 <ul className="divide-y divide-slate-50">
                   {dayMeals.map((meal, idx) => {
                     const badgeClass =
-                      MEAL_TYPE_STYLES[meal.meal_type] || 'bg-slate-100 text-slate-700';
+                      MEAL_TYPE_STYLES[meal.meal_type] || (meal.meal_type && meal.meal_type.startsWith('Snacks') ? MEAL_TYPE_STYLES['Snacks'] : 'bg-slate-100 text-slate-700');
                     return (
                       <li key={idx} className="flex items-start gap-3 px-4 py-3">
                         <span
                           className={`inline-block mt-0.5 px-2 py-0.5 rounded-full text-xs font-medium whitespace-nowrap ${badgeClass}`}
                         >
-                          {meal.meal_type}
+                          {meal.meal_type.startsWith('Snacks-') ? 'Snack ' + meal.meal_type.split('-')[1] : meal.meal_type}
                         </span>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium text-slate-800 truncate">{meal.meal_name}</p>
@@ -493,29 +562,7 @@ const ShoppingList = () => {
             );
           })}
 
-          {/* Action buttons */}
-          {hasMeals && (
-            <div className="mt-6 flex justify-end gap-3">
-              <button
-                onClick={handleCopy}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-sm font-medium transition-colors"
-              >
-                {copied ? 'Copied!' : 'Copy to clipboard'}
-              </button>
-              {hasIngredients && (
-                <button
-                  onClick={handleSaveForShopping}
-                  disabled={savingTrip}
-                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white text-sm font-semibold transition-colors"
-                >
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 0 0-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 0 0-16.536-1.84M7.5 14.25 5.106 5.272M6 20.25a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Zm12.75 0a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Z" />
-                  </svg>
-                  {savingTrip ? 'Saving...' : 'Save for Shopping'}
-                </button>
-              )}
-            </div>
-          )}
+          {/* (Action buttons moved to top of page) */}
 
           {/* Ingredients section */}
           {hasIngredients && (

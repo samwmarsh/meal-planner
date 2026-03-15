@@ -224,14 +224,14 @@ CREATE TABLE shopping_trip_items (
 
 ### 8. UI / UX
 
-- [ ] Responsive layout (desktop + mobile)
+- [x] Responsive layout (desktop + mobile) — hamburger menu, scrollable grids
 - [x] Burger menu navigation
 - [x] Light theme
-- [ ] Dark mode toggle
-- [ ] Loading states / skeletons
-- [ ] Toast notifications (success / error / info)
+- [x] Dark mode toggle — sun/moon icon, class-based, persists to localStorage
+- [x] Loading states / skeletons — all pages
+- [x] Toast notifications (success / error / info)
 - [ ] Mobile-first calendar (swipe between days/weeks)
-- [ ] PWA manifest + service worker (installable on phone, works offline for viewing)
+- [x] PWA manifest + service worker (installable on phone, works offline for viewing)
 
 ---
 
@@ -253,20 +253,38 @@ CREATE TABLE shopping_trip_items (
 14. ✅ **Recipe slug URLs** — `/recipes/:id-slug-title` format; RecipeDetail extracts ID from slug
 15. ✅ **Create recipe from scratch** — form to manually enter title, category, description, servings, timings, macros, ingredients (add/remove rows), method steps
 16. ✅ **Active shopping trip** — "Save for Shopping" snapshots the week's ingredient list; `/shopping-list/active` lets you check off items in-store, add custom items, group by category, and complete/archive the trip
-17. **UI polish pass 2** — production-ready feel throughout:
-   - Toast notifications (replace inline success/error text)
-   - Loading skeletons instead of plain "Loading…" text
-   - Responsive/mobile layout improvements
-   - Dashboard home page (today's macro summary card, recent weight, quick-add shortcuts)
-   - Delete recipe button
-   - Shopping list unit normalisation (200ml + 0.5L → 700ml)
-18. **Progress charts** — weight trend, calorie intake vs target, macro breakdown over time
-19. **Full daily log** — sleep hours/quality and water intake (fields exist in DB, UI only shows weight)
-20. **Calendar macro colour coding** — green/amber/red cells based on proximity to daily targets
-21. **Meal plan templates + copy previous week**
-22. **Workout tracking** — exercise log, sets/reps, templates
-23. **Admin approval queue** — community recipe submissions
-24. **PWA** — installable, works offline for viewing
+17. ✅ **Recipe reviews** — star ratings (1-5) + comments per recipe, one review per user, average rating display, edit/delete own review
+18. ✅ **Delete recipe** — button on RecipeDetail page with confirmation dialog, author-only
+19. ✅ **Copy previous week** — one-click duplication of last week's meal plan into current week (week view)
+20. ✅ **Progress charts** — weight trend line chart with 30d/60d/90d/All range selector, unit toggle, summary stats
+21. ✅ **Full daily log** — sleep hours/quality rating, water intake with quick-add, notes field (in progress)
+22. ✅ **Toast notifications** — global toast system replacing alerts and inline messages
+23. ✅ **Calendar macro colour coding** — green/amber/red day cells + daily totals with over/under indicators
+24. ✅ **Meal plan templates** — save/apply/delete named weekly templates
+25. ✅ **Workout tracking** — exercise library, log workouts with sets/reps/weight, history view
+26. ✅ **PWA** — installable, service worker with offline caching
+27. ✅ **Calorie/macro intake charts** — daily calorie line chart with target reference line, macro breakdown area chart
+28. ✅ **Recipe search improvements** — dietary tag filter pills, sort by rating/calories, ingredient search, batch ratings endpoint
+29. ✅ **Dashboard redesign** — widget-based home page: today's nutrition, week at a glance, recent weight, shopping trip status, quick actions
+30. ✅ **Multiple snacks** — unlimited snack slots per day (Snacks, Snacks-2, etc.)
+31. ✅ **Smart meal selection** — remaining calorie/macro budget passed to recipe library, sorted by fit
+32. ✅ **Responsive/mobile layout** — hamburger menu, scrollable calendar, stacked forms, mobile-optimized padding
+33. ✅ **Dark mode toggle** — sun/moon icon in header, class-based dark mode, persists to localStorage
+34. ✅ **Shopping list unit normalisation** — g↔kg, ml↔L, tsp↔tbsp↔cup auto-conversion before summing
+35. ✅ **Loading skeletons** — consistent animated skeleton screens on all pages
+36. ✅ **Change password / delete account** — Security section on Profile page
+37. ✅ **Dietary requirements** — PCOS, keto, low carb, high protein, vegan, diabetic presets with auto macro adjustment
+38. ✅ **Workout enhancements** — 26 exercises, cardio distance (km), Push/Pull/Legs/Cardio workout day templates
+39. ✅ **Strava integration** — OAuth2 connect, sync activities as workouts, step estimation, graceful degradation
+40. ✅ **Ingredient name normalisation** — strips prep words, normalises plurals, merges similar shopping list items
+41. ✅ **Recipe budget filtering** — hides over-budget recipes with explanation + "Show all" override
+42. ✅ **Improved ingredient import parser** — handles "400g can", "1small onion" stuck-number patterns
+43. ✅ **Method step scaling** — ingredient quantities in recipe steps scale with servings adjuster
+44. ✅ **Weekly macro pie chart** — donut chart on Progress page showing protein/carbs/fat split
+45. ✅ **Calorie target line** — plotted dashed target line on calorie intake chart
+46. **Admin approval queue** — community recipe submissions with approval workflow
+47. **Recipe photos** — image upload/URL for recipe cards and detail view
+48. **Persistent login** — "remember me" option with 30-day token
 
 ---
 
@@ -284,6 +302,9 @@ CREATE TABLE shopping_trip_items (
 | POST | /api/recipes/:id/submit | Yes | Submit personal recipe for community approval |
 | PUT | /api/recipes/:id | Yes | Edit own recipe |
 | DELETE | /api/recipes/:id | Yes | Delete own recipe |
+| GET | /api/recipes/:id/reviews | No | Get reviews for recipe |
+| POST | /api/recipes/:id/reviews | Yes | Add/update own review |
+| DELETE | /api/recipes/:id/reviews | Yes | Delete own review |
 | GET | /api/admin/recipes/pending | Admin | Approval queue |
 | PUT | /api/admin/recipes/:id/approve | Admin | Approve submission |
 | PUT | /api/admin/recipes/:id/reject | Admin | Reject with reason |
@@ -301,6 +322,17 @@ CREATE TABLE shopping_trip_items (
 | POST | /api/workouts | Yes | Add workout log |
 | GET | /api/exercises | Yes | Exercise library |
 | POST | /api/exercises | Yes | Add exercise |
+| GET | /api/recipes/ratings | No | Batch average ratings for all recipes |
+| PUT | /api/auth/change-password | Yes | Change password |
+| DELETE | /api/auth/account | Yes | Delete account (requires password) |
+| GET | /api/workout-templates | Yes | List workout templates |
+| POST | /api/workout-templates | Yes | Save workout template |
+| DELETE | /api/workout-templates/:id | Yes | Delete workout template |
+| GET | /api/strava/auth-url | Yes | Get Strava OAuth URL |
+| GET | /api/strava/callback | No | Strava OAuth callback |
+| GET | /api/strava/status | Yes | Check Strava connection status |
+| POST | /api/strava/sync | Yes | Sync Strava activities |
+| DELETE | /api/strava/disconnect | Yes | Remove Strava connection |
 | GET | /api/nutrition/lookup | Yes | Ingredient macro lookup |
 
 ---
@@ -426,6 +458,18 @@ CREATE TABLE workout_logs (
   name VARCHAR(100),
   notes TEXT,
   created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Recipe reviews
+CREATE TABLE recipe_reviews (
+  id SERIAL PRIMARY KEY,
+  recipe_id INTEGER REFERENCES recipes(id) ON DELETE CASCADE,
+  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  rating SMALLINT NOT NULL CHECK (rating BETWEEN 1 AND 5),
+  comment TEXT,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW(),
+  UNIQUE(recipe_id, user_id)
 );
 
 -- Workout sets
