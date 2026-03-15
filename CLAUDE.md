@@ -90,7 +90,7 @@ shopping_trip_items (id, trip_id, name, quantity, unit, category, checked, custo
 - JWT expiry is `1h` in auth.js — consider making configurable
 - Frontend has `bcrypt` and `bcryptjs` as dependencies — these should only be in backend
 - `init.sql` schema drifts from running DB over time — keep in sync when adding migration-style changes
-- "Save for Shopping" button may fail if no recipes are assigned to meal plans for the week — needs investigation
+- Shopping list ingredients are stored per full recipe — scaling must divide by `recipe.servings` (fixed)
 
 ## Critical Patterns — Read Before Coding
 

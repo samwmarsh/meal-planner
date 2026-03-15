@@ -185,7 +185,7 @@ app.get('/shopping-list', authenticateToken, async (req, res) => {
     // Ingredient aggregation for recipe-based meal plans
     const { rows: ingRows } = await db.query(
       `SELECT ri.name, ri.quantity, ri.unit, ri.section, ri.notes,
-              r.title AS recipe_title,
+              r.title AS recipe_title, r.servings AS recipe_servings,
               mp.date, mp.meal_type, mp.servings
        FROM recipe_ingredients ri
        JOIN recipes r ON r.id = ri.recipe_id
@@ -201,7 +201,9 @@ app.get('/shopping-list', authenticateToken, async (req, res) => {
       const key = `${row.name.toLowerCase()}||${row.unit || ''}`;
       const hasQty = row.quantity != null && parseFloat(row.quantity) > 0;
       const rawQty = hasQty ? parseFloat(row.quantity) : null;
-      const scaledQty = rawQty != null ? rawQty * parseFloat(row.servings || 1) : null;
+      const recipeServings = parseFloat(row.recipe_servings) || 1;
+      const mealPlanServings = parseFloat(row.servings) || 1;
+      const scaledQty = rawQty != null ? rawQty * (mealPlanServings / recipeServings) : null;
       const dateStr2 = typeof row.date === 'string' ? row.date.slice(0, 10) : row.date.toISOString().slice(0, 10);
       const localDate = new Date(dateStr2 + 'T00:00:00');
       const use = {
