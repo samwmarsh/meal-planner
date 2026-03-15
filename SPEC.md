@@ -27,7 +27,7 @@ A personal meal planning and health tracking app. Users plan their weekly meals 
 
 - [x] Register (username + password)
 - [x] Login / JWT auth
-- [ ] Logout (clear token client-side)
+- [x] Logout (clear token client-side)
 - [ ] Persistent login ("remember me" — 30-day token)
 - [ ] Change password
 - [ ] Delete account
@@ -251,8 +251,8 @@ CREATE TABLE shopping_trip_items (
 12. ✅ **User unit preferences** — weight unit (kg/lbs/st+lbs) and height unit (cm/ft+in) persisted server-side; Preferences card on Profile page auto-saves on change
 13. ✅ **Goal-based macro presets** — switching goal auto-applies sensible protein/carbs/fat split; macro display as read-only tiles (not editable inputs)
 14. ✅ **Recipe slug URLs** — `/recipes/:id-slug-title` format; RecipeDetail extracts ID from slug
-15. **Create recipe from scratch** — form to manually enter title, category, description, servings, timings, macros, ingredients (add/remove rows), method steps
-16. **Active shopping trip** — "Save for Shopping" snapshots the week's ingredient list; `/shopping-list/active` lets you check off items in-store, add custom items, group by category, and complete/archive the trip
+15. ✅ **Create recipe from scratch** — form to manually enter title, category, description, servings, timings, macros, ingredients (add/remove rows), method steps
+16. ✅ **Active shopping trip** — "Save for Shopping" snapshots the week's ingredient list; `/shopping-list/active` lets you check off items in-store, add custom items, group by category, and complete/archive the trip
 17. **UI polish pass 2** — production-ready feel throughout:
    - Toast notifications (replace inline success/error text)
    - Loading skeletons instead of plain "Loading…" text

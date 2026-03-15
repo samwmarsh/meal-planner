@@ -242,6 +242,144 @@ app.get('/shopping-list', authenticateToken, async (req, res) => {
   }
 });
 
+// ── Shopping Trips ────────────────────────────────────────────────────────────
+
+// Auto-categorise an ingredient name into a shopping aisle
+const CATEGORY_KEYWORDS = {
+  'Meat & Fish': ['chicken','beef','pork','lamb','mince','steak','salmon','prawn','shrimp','fish','bacon','sausage','turkey','cod','tuna','ham','chorizo'],
+  'Dairy': ['milk','cheese','cream','butter','yogurt','yoghurt','egg','eggs','crème','creme','soured cream'],
+  'Produce': ['onion','garlic','pepper','tomato','potato','carrot','lettuce','spinach','avocado','lemon','lime','ginger','chilli','cucumber','mushroom','courgette','broccoli','celery','coriander','parsley','basil','mint','thyme','rosemary'],
+  'Bakery': ['bread','roll','bun','tortilla','wrap','naan','pitta','croissant','bagel','flour','yeast'],
+  'Dry Goods': ['rice','pasta','noodle','lentil','chickpea','bean','oat','cereal','sugar','stock','sauce','oil','vinegar','soy','spice','paprika','cumin','curry','mustard','honey','peanut butter','coconut milk','passata','chopped tomatoes','worcestershire'],
+  'Frozen': ['frozen','ice cream'],
+};
+
+function categoriseIngredient(name) {
+  const lower = (name || '').toLowerCase();
+  for (const [cat, keywords] of Object.entries(CATEGORY_KEYWORDS)) {
+    if (keywords.some(kw => lower.includes(kw))) return cat;
+  }
+  return 'Other';
+}
+
+// Get active shopping trip
+app.get('/shopping-trips/active', authenticateToken, async (req, res) => {
+  try {
+    const { rows } = await db.query(
+      `SELECT * FROM shopping_trips WHERE user_id = $1 AND status = 'active' ORDER BY created_at DESC LIMIT 1`,
+      [req.user.id]
+    );
+    if (rows.length === 0) return res.json(null);
+    const trip = rows[0];
+    const { rows: items } = await db.query(
+      'SELECT * FROM shopping_trip_items WHERE trip_id = $1 ORDER BY category, position', [trip.id]
+    );
+    res.json({ ...trip, items });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch trip', details: err.message });
+  }
+});
+
+// Save a new shopping trip from current week's ingredients
+app.post('/shopping-trips', authenticateToken, async (req, res) => {
+  try {
+    const { name, weekStart, items } = req.body;
+    if (!items || !items.length) return res.status(400).json({ error: 'items array is required' });
+
+    // Mark any existing active trip as completed
+    await db.query(
+      `UPDATE shopping_trips SET status = 'completed', completed_at = NOW()
+       WHERE user_id = $1 AND status = 'active'`,
+      [req.user.id]
+    );
+
+    const { rows } = await db.query(
+      `INSERT INTO shopping_trips (user_id, week_start, name, status)
+       VALUES ($1, $2, $3, 'active') RETURNING *`,
+      [req.user.id, weekStart || null, name || 'Shopping List']
+    );
+    const trip = rows[0];
+
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      await db.query(
+        `INSERT INTO shopping_trip_items (trip_id, name, quantity, unit, category, checked, custom, position)
+         VALUES ($1, $2, $3, $4, $5, false, $6, $7)`,
+        [trip.id, item.name, item.quantity ?? null, item.unit || null,
+         item.category || categoriseIngredient(item.name), item.custom || false, i + 1]
+      );
+    }
+
+    const { rows: savedItems } = await db.query(
+      'SELECT * FROM shopping_trip_items WHERE trip_id = $1 ORDER BY category, position', [trip.id]
+    );
+    res.status(201).json({ ...trip, items: savedItems });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to create trip', details: err.message });
+  }
+});
+
+// Toggle item checked state
+app.patch('/shopping-trips/items/:itemId', authenticateToken, async (req, res) => {
+  try {
+    const { checked } = req.body;
+    const { rows } = await db.query(
+      `UPDATE shopping_trip_items SET checked = $1
+       WHERE id = $2 AND trip_id IN (SELECT id FROM shopping_trips WHERE user_id = $3)
+       RETURNING *`,
+      [checked, req.params.itemId, req.user.id]
+    );
+    if (rows.length === 0) return res.status(404).json({ error: 'Item not found' });
+    res.json(rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to update item', details: err.message });
+  }
+});
+
+// Add custom item to active trip
+app.post('/shopping-trips/active/items', authenticateToken, async (req, res) => {
+  try {
+    const { name, quantity, unit, category } = req.body;
+    if (!name) return res.status(400).json({ error: 'name is required' });
+
+    const { rows: trips } = await db.query(
+      `SELECT id FROM shopping_trips WHERE user_id = $1 AND status = 'active' LIMIT 1`,
+      [req.user.id]
+    );
+    if (trips.length === 0) return res.status(404).json({ error: 'No active trip' });
+
+    const tripId = trips[0].id;
+    const { rows: maxPos } = await db.query(
+      'SELECT COALESCE(MAX(position), 0) + 1 AS pos FROM shopping_trip_items WHERE trip_id = $1', [tripId]
+    );
+
+    const { rows } = await db.query(
+      `INSERT INTO shopping_trip_items (trip_id, name, quantity, unit, category, checked, custom, position)
+       VALUES ($1, $2, $3, $4, $5, false, true, $6) RETURNING *`,
+      [tripId, name, quantity ?? null, unit || null,
+       category || categoriseIngredient(name), maxPos[0].pos]
+    );
+    res.status(201).json(rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to add item', details: err.message });
+  }
+});
+
+// Complete active trip
+app.post('/shopping-trips/active/complete', authenticateToken, async (req, res) => {
+  try {
+    const { rows } = await db.query(
+      `UPDATE shopping_trips SET status = 'completed', completed_at = NOW()
+       WHERE user_id = $1 AND status = 'active' RETURNING *`,
+      [req.user.id]
+    );
+    if (rows.length === 0) return res.status(404).json({ error: 'No active trip' });
+    res.json(rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to complete trip', details: err.message });
+  }
+});
+
 app.use('/auth', authRoutes); // Routes will be prefixed with /auth
 
 // Get user profile (with latest weight from daily_logs)
@@ -386,6 +524,64 @@ app.get('/recipes', async (req, res) => {
   }
 });
 
+// Create a new recipe from scratch
+app.post('/recipes', authenticateToken, async (req, res) => {
+  try {
+    const {
+      title, description, servings, prep_time_mins, cook_time_mins, category,
+      dietary_tags, calories_per_serving, protein_per_serving, carbs_per_serving,
+      fat_per_serving, source_url, ingredients = [], steps = []
+    } = req.body;
+
+    if (!title) return res.status(400).json({ error: 'title is required' });
+
+    const { rows: recipeRows } = await db.query(
+      `INSERT INTO recipes (title, description, servings, prep_time_mins, cook_time_mins, category,
+         dietary_tags, calories_per_serving, protein_per_serving, carbs_per_serving, fat_per_serving,
+         status, source_url, author_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'personal',$12,$13)
+       RETURNING id`,
+      [title, description || null, servings || 1, prep_time_mins || 0, cook_time_mins || 0,
+       category || 'Dinner', dietary_tags || [], calories_per_serving || 0,
+       protein_per_serving || 0, carbs_per_serving || 0, fat_per_serving || 0,
+       source_url || null, req.user.id]
+    );
+    const recipeId = recipeRows[0].id;
+
+    for (let i = 0; i < ingredients.length; i++) {
+      const ing = ingredients[i];
+      await db.query(
+        `INSERT INTO recipe_ingredients (recipe_id, section, position, quantity, unit, name, notes)
+         VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+        [recipeId, ing.section || 'Ingredients', ing.position || i + 1,
+         ing.quantity || null, ing.unit || null, ing.name, ing.notes || '']
+      );
+    }
+
+    for (let i = 0; i < steps.length; i++) {
+      const step = steps[i];
+      await db.query(
+        `INSERT INTO recipe_steps (recipe_id, section, position, instruction)
+         VALUES ($1,$2,$3,$4)`,
+        [recipeId, step.section || 'Method', step.position || i + 1, step.instruction]
+      );
+    }
+
+    await reparsStepIngredients(recipeId);
+
+    const { rows: fullRecipe } = await db.query('SELECT * FROM recipes WHERE id = $1', [recipeId]);
+    const { rows: savedIngredients } = await db.query(
+      'SELECT * FROM recipe_ingredients WHERE recipe_id = $1 ORDER BY section, position', [recipeId]
+    );
+    const { rows: savedSteps } = await db.query(
+      'SELECT * FROM recipe_steps WHERE recipe_id = $1 ORDER BY section, position', [recipeId]
+    );
+    res.status(201).json({ ...fullRecipe[0], ingredients: savedIngredients, steps: savedSteps });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to create recipe', details: err.message });
+  }
+});
+
 // Get single recipe with ingredients and steps
 app.get('/recipes/:id', async (req, res) => {
   try {
@@ -435,6 +631,24 @@ app.patch('/recipes/:id', authenticateToken, async (req, res) => {
     res.json(rows[0]);
   } catch (err) {
     res.status(500).json({ error: 'Failed to update recipe', details: err.message });
+  }
+});
+
+// Delete a recipe (author only) — cascades to ingredients and steps
+app.delete('/recipes/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { rows } = await db.query('SELECT author_id FROM recipes WHERE id = $1', [id]);
+    if (rows.length === 0) return res.status(404).json({ error: 'Recipe not found' });
+    if (rows[0].author_id !== req.user.id) {
+      return res.status(403).json({ error: 'You can only delete your own recipes' });
+    }
+    await db.query('DELETE FROM recipe_steps WHERE recipe_id = $1', [id]);
+    await db.query('DELETE FROM recipe_ingredients WHERE recipe_id = $1', [id]);
+    await db.query('DELETE FROM recipes WHERE id = $1', [id]);
+    res.sendStatus(204);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to delete recipe', details: err.message });
   }
 });
 

@@ -103,6 +103,9 @@ CREATE TABLE IF NOT EXISTS recipes (
   updated_at TIMESTAMP DEFAULT NOW()
 );
 
+-- Add recipe_id to meal_plans (after recipes table exists)
+ALTER TABLE meal_plans ADD COLUMN IF NOT EXISTS recipe_id INTEGER REFERENCES recipes(id) ON DELETE SET NULL;
+
 CREATE TABLE IF NOT EXISTS recipe_ingredients (
   id SERIAL PRIMARY KEY,
   recipe_id INTEGER REFERENCES recipes(id) ON DELETE CASCADE,
@@ -112,6 +115,28 @@ CREATE TABLE IF NOT EXISTS recipe_ingredients (
   unit VARCHAR(30),
   name VARCHAR(150) NOT NULL,
   notes VARCHAR(200)
+);
+
+CREATE TABLE IF NOT EXISTS shopping_trips (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  week_start DATE,
+  name VARCHAR(100),
+  status VARCHAR(20) DEFAULT 'active',
+  created_at TIMESTAMP DEFAULT NOW(),
+  completed_at TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS shopping_trip_items (
+  id SERIAL PRIMARY KEY,
+  trip_id INTEGER REFERENCES shopping_trips(id) ON DELETE CASCADE,
+  name VARCHAR(200) NOT NULL,
+  quantity NUMERIC,
+  unit VARCHAR(30),
+  category VARCHAR(50) DEFAULT 'Other',
+  checked BOOLEAN DEFAULT false,
+  custom BOOLEAN DEFAULT false,
+  position INTEGER
 );
 
 CREATE TABLE IF NOT EXISTS recipe_steps (

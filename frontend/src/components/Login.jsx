@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import API_BASE_URL from '../config';
 
 const Login = () => {
+  const navigate = useNavigate();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -20,7 +21,7 @@ const Login = () => {
     if (response.ok) {
       const data = await response.json();
       localStorage.setItem('token', data.token);
-      window.location.href = '/';
+      navigate('/');
     } else {
       setError('Invalid credentials');
     }

@@ -12,6 +12,7 @@ import DailyLog from './components/DailyLog';
 import RecipeLibrary from './components/RecipeLibrary';
 import RecipeDetail from './components/RecipeDetail';
 import ImportRecipe from './components/ImportRecipe';
+import CreateRecipe from './components/CreateRecipe';
 import Header from './components/Header';
 
 const isAuthenticated = () => !!localStorage.getItem('token');
@@ -24,6 +25,7 @@ function App() {
         <Routes>
           <Route path="/" element={isAuthenticated() ? <Dashboard /> : <Navigate to="/login" />} />
           <Route path="/recipes" element={isAuthenticated() ? <RecipeLibrary /> : <Navigate to="/login" />} />
+          <Route path="/recipes/create" element={isAuthenticated() ? <CreateRecipe /> : <Navigate to="/login" />} />
           <Route path="/recipes/import" element={isAuthenticated() ? <ImportRecipe /> : <Navigate to="/login" />} />
           <Route path="/recipes/:id" element={isAuthenticated() ? <RecipeDetail /> : <Navigate to="/login" />} />
           <Route path="/shopping-list" element={isAuthenticated() ? <ShoppingList /> : <Navigate to="/login" />} />

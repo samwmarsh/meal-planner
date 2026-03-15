@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import API_BASE_URL from '../config';
 
 const Register = () => {
+  const navigate = useNavigate();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -19,7 +20,7 @@ const Register = () => {
 
     if (response.ok) {
       await response.text();
-      window.location.href = '/login';
+      navigate('/login');
     } else {
       setError('Registration failed, this username may already exist');
     }

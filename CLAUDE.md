@@ -72,19 +72,25 @@ Required:
 ## Database Schema
 
 ```sql
-users        (id, username, password_hash, created_at)
-meals        (id, name, type)                          -- type: Breakfast|Lunch|Dinner|Snacks
-meal_plans   (user_id, date, meal_type, meal_name, last_updated)
-             UNIQUE(user_id, date, meal_type)
+users          (id, username, password_hash, created_at)
+user_profiles  (user_id, date_of_birth, sex, height_cm, activity_level, goal, ...)
+meals          (id, name, type)                          -- type: Breakfast|Lunch|Dinner|Snacks
+recipes        (id, author_id, title, category, servings, macros, source_url, ...)
+recipe_ingredients (id, recipe_id, section, position, quantity, unit, name, notes)
+recipe_steps   (id, recipe_id, section, position, instruction, ingredient_refs)
+meal_plans     (id, user_id, date, meal_type, meal_id, recipe_id, servings)
+               UNIQUE(user_id, date, meal_type)
+daily_logs     (id, user_id, date, weight_kg, sleep_hours, water_ml, notes)
+shopping_trips (id, user_id, week_start, name, status)
+shopping_trip_items (id, trip_id, name, quantity, unit, category, checked, custom)
 ```
 
 ## Known Issues / Tech Debt
 
-- `auth.js` has its own DB pool (duplicate of `db.js`) — should be consolidated
-- JWT expiry is `1h` in auth.js but `7d` in `generateToken` in middleware/auth.js — needs unifying
-- `generateToken` in middleware/auth.js is defined but never used by login flow
+- JWT expiry is `1h` in auth.js — consider making configurable
 - Frontend has `bcrypt` and `bcryptjs` as dependencies — these should only be in backend
-- No error handling on `/meals` and `/meal-plans` GET endpoints (unhandled promise rejections)
+- `init.sql` schema drifts from running DB over time — keep in sync when adding migration-style changes
+- "Save for Shopping" button may fail if no recipes are assigned to meal plans for the week — needs investigation
 
 ## Critical Patterns — Read Before Coding
 

@@ -11,16 +11,17 @@ const MEAL_TYPE_STYLES = {
 
 const DAY_ORDER = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
+const CATEGORY_ORDER = ['Produce', 'Meat & Fish', 'Dairy', 'Bakery', 'Dry Goods', 'Frozen', 'Other'];
+
 function getMondayOfWeek(date) {
   const d = new Date(date);
-  const day = d.getDay(); // 0 = Sun, 1 = Mon ...
+  const day = d.getDay();
   const diff = day === 0 ? -6 : 1 - day;
   d.setDate(d.getDate() + diff);
   return d;
 }
 
 function toISODate(date) {
-  // Use local date parts to avoid UTC-offset day shifts
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, '0');
   const d = String(date.getDate()).padStart(2, '0');
@@ -64,6 +65,164 @@ function formatQty(n) {
   return Number.isInteger(n) ? String(n) : String(parseFloat(n.toFixed(2)));
 }
 
+// ── Active Shopping Trip View ─────────────────────────────────────────────────
+
+const ActiveTripView = ({ trip: initialTrip, onBack }) => {
+  const [trip, setTrip] = useState(initialTrip);
+  const [items, setItems] = useState(initialTrip.items || []);
+  const [newItemName, setNewItemName] = useState('');
+  const [completing, setCompleting] = useState(false);
+
+  const checkedCount = items.filter(i => i.checked).length;
+
+  const toggleItem = async (item) => {
+    const newChecked = !item.checked;
+    setItems(prev => prev.map(i => i.id === item.id ? { ...i, checked: newChecked } : i));
+    try {
+      const token = localStorage.getItem('token');
+      await fetch(`${API_BASE_URL}/shopping-trips/items/${item.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ checked: newChecked }),
+      });
+    } catch { /* optimistic UI — already updated locally */ }
+  };
+
+  const addCustomItem = async () => {
+    if (!newItemName.trim()) return;
+    const token = localStorage.getItem('token');
+    try {
+      const res = await fetch(`${API_BASE_URL}/shopping-trips/active/items`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ name: newItemName.trim() }),
+      });
+      if (res.ok) {
+        const item = await res.json();
+        setItems(prev => [...prev, item]);
+        setNewItemName('');
+      }
+    } catch { /* silent */ }
+  };
+
+  const completeTrip = async () => {
+    setCompleting(true);
+    try {
+      const token = localStorage.getItem('token');
+      await fetch(`${API_BASE_URL}/shopping-trips/active/complete`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      onBack();
+    } catch { setCompleting(false); }
+  };
+
+  // Group items by category
+  const grouped = {};
+  for (const item of items) {
+    const cat = item.category || 'Other';
+    if (!grouped[cat]) grouped[cat] = [];
+    grouped[cat].push(item);
+  }
+  const sortedCategories = CATEGORY_ORDER.filter(c => grouped[c]?.length > 0);
+  // Add any categories not in the standard order
+  for (const c of Object.keys(grouped)) {
+    if (!sortedCategories.includes(c)) sortedCategories.push(c);
+  }
+
+  return (
+    <div className="max-w-3xl mx-auto">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <button onClick={onBack} className="text-sm text-slate-500 hover:text-blue-600 mb-1 flex items-center gap-1">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+            </svg>
+            Back to plan
+          </button>
+          <h1 className="text-2xl font-bold text-slate-800">{trip.name}</h1>
+        </div>
+        <button
+          onClick={completeTrip}
+          disabled={completing}
+          className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white text-sm font-semibold rounded-lg transition-colors"
+        >
+          {completing ? 'Completing...' : 'Complete Trip'}
+        </button>
+      </div>
+
+      {/* Progress */}
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 mb-6">
+        <div className="flex items-center justify-between text-sm mb-2">
+          <span className="text-slate-600 font-medium">{checkedCount} of {items.length} items</span>
+          <span className="text-slate-400">{items.length > 0 ? Math.round(checkedCount / items.length * 100) : 0}%</span>
+        </div>
+        <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+          <div
+            className="h-full bg-green-500 rounded-full transition-all duration-300"
+            style={{ width: `${items.length > 0 ? (checkedCount / items.length * 100) : 0}%` }}
+          />
+        </div>
+      </div>
+
+      {/* Add custom item */}
+      <div className="flex gap-2 mb-6">
+        <input
+          type="text"
+          value={newItemName}
+          onChange={e => setNewItemName(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && addCustomItem()}
+          placeholder="Add an item..."
+          className="flex-1 border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+        />
+        <button
+          onClick={addCustomItem}
+          disabled={!newItemName.trim()}
+          className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-semibold rounded-xl transition-colors"
+        >
+          Add
+        </button>
+      </div>
+
+      {/* Items grouped by category */}
+      {sortedCategories.map(category => (
+        <div key={category} className="mb-4">
+          <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-2 px-1">{category}</h3>
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden divide-y divide-slate-50">
+            {grouped[category].map(item => (
+              <div
+                key={item.id}
+                className={`flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors ${item.checked ? 'bg-slate-50' : 'hover:bg-slate-50'}`}
+                onClick={() => toggleItem(item)}
+              >
+                <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition-colors ${item.checked ? 'bg-green-500 border-green-500' : 'border-slate-300'}`}>
+                  {item.checked && (
+                    <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <span className={`text-sm ${item.checked ? 'line-through text-slate-400' : 'text-slate-800'}`}>
+                    {item.quantity != null && <span className="font-semibold">{formatQty(item.quantity)}{item.unit ? ` ${item.unit}` : ''} </span>}
+                    {item.name}
+                  </span>
+                </div>
+                {item.custom && (
+                  <span className="text-xs text-slate-400 bg-slate-100 rounded-full px-2 py-0.5">added</span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+// ── Main Shopping List ────────────────────────────────────────────────────────
+
 const ShoppingList = () => {
   const [weekStart, setWeekStart] = useState(() => toISODate(getMondayOfWeek(new Date())));
   const [data, setData] = useState(null);
@@ -71,6 +230,21 @@ const ShoppingList = () => {
   const [error, setError] = useState(null);
   const [copied, setCopied] = useState(false);
   const [expandedIngredients, setExpandedIngredients] = useState(new Set());
+  const [activeTrip, setActiveTrip] = useState(null);
+  const [checkingTrip, setCheckingTrip] = useState(true);
+  const [savingTrip, setSavingTrip] = useState(false);
+
+  // Check for active trip on mount
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    fetch(`${API_BASE_URL}/shopping-trips/active`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then(r => r.json())
+      .then(trip => { if (trip && trip.id) setActiveTrip(trip); })
+      .catch(() => {})
+      .finally(() => setCheckingTrip(false));
+  }, []);
 
   const fetchShoppingList = useCallback(async (start) => {
     setLoading(true);
@@ -128,8 +302,50 @@ const ShoppingList = () => {
     }
   };
 
+  const handleSaveForShopping = async () => {
+    if (!data?.ingredients?.length) return;
+    setSavingTrip(true);
+    try {
+      const token = localStorage.getItem('token');
+      const items = data.ingredients.map(ing => ({
+        name: ing.name,
+        quantity: ing.totalQuantity,
+        unit: ing.unit || null,
+      }));
+      const res = await fetch(`${API_BASE_URL}/shopping-trips`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          name: `Week of ${formatDisplayDate(weekStart)}`,
+          weekStart,
+          items,
+        }),
+      });
+      if (res.ok) {
+        const trip = await res.json();
+        setActiveTrip(trip);
+      }
+    } catch { /* silent */ }
+    finally { setSavingTrip(false); }
+  };
+
+  // Show active trip view if one exists and user is on it
+  if (activeTrip) {
+    return (
+      <ActiveTripView
+        trip={activeTrip}
+        onBack={() => { setActiveTrip(null); }}
+      />
+    );
+  }
+
+  if (checkingTrip) {
+    return <div className="text-center py-12 text-slate-500 text-sm">Loading...</div>;
+  }
+
   const mealsGrouped = groupedByDay();
   const hasMeals = data && data.meals.length > 0;
+  const hasIngredients = data?.ingredients?.length > 0;
 
   return (
     <div className="max-w-3xl mx-auto">
@@ -174,12 +390,12 @@ const ShoppingList = () => {
 
       {/* Loading */}
       {loading && (
-        <div className="text-center py-12 text-slate-500 text-sm">Loading…</div>
+        <div className="text-center py-12 text-slate-500 text-sm">Loading...</div>
       )}
 
       {!loading && data && (
         <>
-          {/* Weekly macro summary card — only when there are meals */}
+          {/* Weekly macro summary card */}
           {hasMeals && (
             <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 mb-6">
               <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-3">
@@ -216,7 +432,6 @@ const ShoppingList = () => {
                 viewBox="0 0 24 24"
                 strokeWidth={1.5}
                 stroke="currentColor"
-                aria-hidden="true"
               >
                 <path
                   strokeLinecap="round"
@@ -278,20 +493,32 @@ const ShoppingList = () => {
             );
           })}
 
-          {/* Copy to clipboard — only when there are meals */}
+          {/* Action buttons */}
           {hasMeals && (
-            <div className="mt-6 flex justify-end">
+            <div className="mt-6 flex justify-end gap-3">
               <button
                 onClick={handleCopy}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-colors"
+                className="flex items-center gap-2 px-4 py-2 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-sm font-medium transition-colors"
               >
                 {copied ? 'Copied!' : 'Copy to clipboard'}
               </button>
+              {hasIngredients && (
+                <button
+                  onClick={handleSaveForShopping}
+                  disabled={savingTrip}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white text-sm font-semibold transition-colors"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 0 0-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 0 0-16.536-1.84M7.5 14.25 5.106 5.272M6 20.25a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Zm12.75 0a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Z" />
+                  </svg>
+                  {savingTrip ? 'Saving...' : 'Save for Shopping'}
+                </button>
+              )}
             </div>
           )}
 
-          {/* Ingredients section — only for recipe-based meals */}
-          {data.ingredients && data.ingredients.length > 0 && (
+          {/* Ingredients section */}
+          {hasIngredients && (
             <div className="mt-6">
               <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-3">
                 Ingredients
