@@ -1,0 +1,26 @@
+version: 0.0
+os: linux
+files:
+  - source: /
+    destination: /home/ec2-user/meal-planner
+    overwrite: true
+
+file_exists_behavior: OVERWRITE
+
+hooks:
+  ApplicationStop:
+    - location: scripts/deploy/stop.sh
+      timeout: 60
+      runas: ec2-user
+  AfterInstall:
+    - location: scripts/deploy/after-install.sh
+      timeout: 300
+      runas: ec2-user
+  ApplicationStart:
+    - location: scripts/deploy/start.sh
+      timeout: 300
+      runas: ec2-user
+  ValidateService:
+    - location: scripts/deploy/validate.sh
+      timeout: 120
+      runas: ec2-user
