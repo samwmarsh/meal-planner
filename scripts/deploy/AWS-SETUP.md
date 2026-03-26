@@ -54,13 +54,20 @@ sudo systemctl start docker
 sudo usermod -aG docker ec2-user
 ```
 
-### Install Docker Compose plugin
+### Install Docker Compose + BuildX plugins
 
 ```bash
 sudo mkdir -p /usr/local/lib/docker/cli-plugins
+
+# Docker Compose
 sudo curl -SL "https://github.com/docker/compose/releases/latest/download/docker-compose-linux-x86_64" \
   -o /usr/local/lib/docker/cli-plugins/docker-compose
 sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+
+# BuildX (must be v0.17.0+ for compose build to work)
+sudo curl -SL "https://github.com/docker/buildx/releases/download/v0.22.0/buildx-v0.22.0.linux-amd64" \
+  -o /usr/local/lib/docker/cli-plugins/docker-buildx
+sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-buildx
 ```
 
 ### Install CodeDeploy agent
@@ -86,6 +93,14 @@ sudo swapon /swapfile
 echo '/swapfile swap swap defaults 0 0' | sudo tee -a /etc/fstab
 ```
 
+### Install cronie (for crontab — not included in Amazon Linux 2023 by default)
+
+```bash
+sudo dnf install -y cronie
+sudo systemctl enable crond
+sudo systemctl start crond
+```
+
 ### Verify everything
 
 ```bash
@@ -95,8 +110,10 @@ ssh -i your-key.pem ec2-user@<your-ec2-public-dns>
 
 docker --version
 docker compose version
+docker buildx version    # must be v0.17.0+
+crontab -l               # should work without error
 sudo systemctl status codedeploy-agent
-free -h   # should show swap
+free -h                  # should show swap
 ```
 
 ---
@@ -235,39 +252,49 @@ nano .env
 
 ---
 
-## Step 9: Set Up DB Backups
+## Step 9: Clone the Repo and Set Up DB Backups
 
 ```bash
 ssh -i your-key.pem ec2-user@<your-ec2-public-dns>
 
-# Make backup script executable
-chmod +x /home/ec2-user/meal-planner/scripts/deploy/backup-db.sh
+# Clone the repo (if .env already exists in the directory, move it out first)
+cd /home/ec2-user
+mv meal-planner/.env .env.backup 2>/dev/null || true
+rm -rf meal-planner
+git clone https://github.com/samwmarsh/meal-planner.git /home/ec2-user/meal-planner
+mv .env.backup meal-planner/.env 2>/dev/null || true
 
-# Add to crontab (runs at 3am daily)
-crontab -e
-# Add this line:
-0 3 * * * /home/ec2-user/meal-planner/scripts/deploy/backup-db.sh >> /home/ec2-user/backups/cron.log 2>&1
+# Make all deploy scripts executable
+chmod +x /home/ec2-user/meal-planner/scripts/deploy/*.sh
+
+# Set up backup cron (runs at 3am daily, keeps 7 days)
+mkdir -p /home/ec2-user/backups
+(crontab -l 2>/dev/null; echo '0 3 * * * /home/ec2-user/meal-planner/scripts/deploy/backup-db.sh >> /home/ec2-user/backups/cron.log 2>&1') | crontab -
+
+# Verify
+crontab -l
+ls /home/ec2-user/meal-planner/scripts/deploy/
 ```
 
 ---
 
 ## Step 10: First Deploy
 
-Either push a commit to main (triggers GitHub Actions), or do a manual first deploy:
+The repo was cloned in Step 9. Now build and start:
 
 ```bash
-# On EC2, do the initial clone manually
 cd /home/ec2-user/meal-planner
-git clone https://github.com/samwmarsh/meal-planner.git .
-# (the .env file is already here and won't be overwritten)
-
 docker compose up --build -d
 
-# Check it's working
+# Wait for DB to become healthy and backend to start
+sleep 15
 curl http://localhost/api/health
+# Should return: {"status":"ok","time":"..."}
 ```
 
-Then push any commit to main — CodeDeploy will handle all future deploys automatically.
+If all is well, open your browser and go to `http://<your-ec2-public-dns>`.
+
+From now on, every push to main will auto-deploy via CodeDeploy.
 
 **Your app will be available at:** `http://<your-ec2-public-dns>`
 
@@ -281,6 +308,15 @@ sudo systemctl status codedeploy-agent
 sudo systemctl restart codedeploy-agent
 # Check logs:
 tail -50 /var/log/aws/codedeploy-agent/codedeploy-agent.log
+```
+
+### "compose build requires buildx 0.17.0 or later"
+```bash
+docker buildx version
+# If missing or <0.17.0, reinstall:
+sudo curl -SL "https://github.com/docker/buildx/releases/download/v0.22.0/buildx-v0.22.0.linux-amd64" \
+  -o /usr/local/lib/docker/cli-plugins/docker-buildx
+sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-buildx
 ```
 
 ### Docker build fails (out of memory)
