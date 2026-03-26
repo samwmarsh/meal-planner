@@ -18,6 +18,8 @@
  */
 
 require('dotenv').config({ path: require('path').join(__dirname, '../.env') });
+const fs = require('fs');
+const path = require('path');
 const { Pool } = require('pg');
 const fetch = (...args) => import('node-fetch').then(({ default: f }) => f(...args));
 const { load: cheerioLoad } = require('cheerio');
@@ -231,22 +233,81 @@ async function insertRecipe(r) {
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 async function main() {
-  const urls = process.argv.slice(2).length ? process.argv.slice(2) : RECIPE_URLS;
-  console.log(`Scraping ${urls.length} recipe(s)...\n`);
+  // If CLI args are provided, use those URLs directly
+  if (process.argv.slice(2).length) {
+    const urls = process.argv.slice(2);
+    console.log(`Scraping ${urls.length} recipe(s) from CLI args...\n`);
+    let ok = 0, fail = 0;
+    for (const url of urls) {
+      try {
+        const recipe = await scrapeUrl(url);
+        await insertRecipe(recipe);
+        ok++;
+      } catch (err) {
+        console.error(`  ✗ Failed: ${err.message}`);
+        fail++;
+      }
+    }
+    console.log(`\nDone: ${ok} succeeded, ${fail} failed.`);
+    await pool.end();
+    return;
+  }
 
-  let ok = 0, fail = 0;
-  for (const url of urls) {
+  // Try to load scrape-urls.json for richer URL definitions with extra_tags
+  const jsonPath = path.join(__dirname, 'scrape-urls.json');
+  let urlEntries = null;
+  if (fs.existsSync(jsonPath)) {
     try {
-      const recipe = await scrapeUrl(url);
-      await insertRecipe(recipe);
-      ok++;
+      urlEntries = JSON.parse(fs.readFileSync(jsonPath, 'utf-8'));
+      console.log(`Loaded ${urlEntries.length} URL(s) from scrape-urls.json\n`);
     } catch (err) {
-      console.error(`  ✗ Failed: ${err.message}`);
-      fail++;
+      console.warn(`Warning: could not parse scrape-urls.json (${err.message}), falling back to hardcoded URLs.\n`);
     }
   }
 
-  console.log(`\nDone: ${ok} succeeded, ${fail} failed.`);
+  if (urlEntries && Array.isArray(urlEntries)) {
+    let ok = 0, fail = 0;
+    for (const entry of urlEntries) {
+      try {
+        const recipe = await scrapeUrl(entry.url);
+        // Apply extra_tags from the JSON entry
+        if (Array.isArray(entry.extra_tags)) {
+          for (const tag of entry.extra_tags) {
+            if (!recipe.tags.includes(tag)) {
+              recipe.tags.push(tag);
+            }
+          }
+        }
+        // Apply category_hint if the scraper inferred a generic category
+        if (entry.category_hint && (!recipe.category || recipe.category === 'Dinner')) {
+          recipe.category = entry.category_hint;
+        }
+        await insertRecipe(recipe);
+        ok++;
+      } catch (err) {
+        console.error(`  ✗ Failed (${entry.url}): ${err.message}`);
+        fail++;
+      }
+    }
+    console.log(`\nDone: ${ok} succeeded, ${fail} failed.`);
+  } else {
+    // Fall back to hardcoded RECIPE_URLS array
+    const urls = RECIPE_URLS;
+    console.log(`Scraping ${urls.length} recipe(s) from hardcoded list...\n`);
+    let ok = 0, fail = 0;
+    for (const url of urls) {
+      try {
+        const recipe = await scrapeUrl(url);
+        await insertRecipe(recipe);
+        ok++;
+      } catch (err) {
+        console.error(`  ✗ Failed: ${err.message}`);
+        fail++;
+      }
+    }
+    console.log(`\nDone: ${ok} succeeded, ${fail} failed.`);
+  }
+
   await pool.end();
 }
 

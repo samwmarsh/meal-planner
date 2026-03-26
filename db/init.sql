@@ -216,6 +216,21 @@ CREATE TABLE IF NOT EXISTS workout_templates (
   created_at TIMESTAMP DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS recipe_collections (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  name VARCHAR(100) NOT NULL,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS recipe_collection_items (
+  id SERIAL PRIMARY KEY,
+  collection_id INTEGER REFERENCES recipe_collections(id) ON DELETE CASCADE,
+  recipe_id INTEGER REFERENCES recipes(id) ON DELETE CASCADE,
+  added_at TIMESTAMP DEFAULT NOW(),
+  UNIQUE(collection_id, recipe_id)
+);
+
 -- Seed common exercises
 INSERT INTO exercises (name, category, muscle_groups) VALUES
   ('Bench Press', 'Strength', ARRAY['Chest', 'Triceps', 'Shoulders']),

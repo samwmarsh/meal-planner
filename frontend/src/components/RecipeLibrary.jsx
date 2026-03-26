@@ -4,13 +4,13 @@ import axios from 'axios';
 import API_BASE_URL from '../config';
 
 const CATEGORIES = ['All', 'Breakfast', 'Lunch', 'Dinner', 'Snacks'];
-const DIETARY_TAGS = ['vegan', 'vegetarian', 'gluten-free', 'dairy-free', 'keto'];
+const DIETARY_TAGS = ['vegan', 'vegetarian', 'gluten-free', 'dairy-free', 'keto', 'low-glycemic', 'high-protein', 'low-carb'];
 const SORT_OPTIONS = [
   { value: 'newest', label: 'Newest' },
   { value: 'rating', label: 'Rating' },
   { value: 'calories', label: 'Calories (low)' },
 ];
-const VIEW_TABS = ['All Recipes', 'This Week'];
+const VIEW_TABS = ['All Recipes', 'This Week', 'Collections'];
 
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -293,6 +293,15 @@ const RecipeLibrary = () => {
   const [weekMealPlans, setWeekMealPlans] = useState([]);
   const [weekLoading, setWeekLoading] = useState(false);
 
+  // Collections state
+  const [userCollections, setUserCollections] = useState([]);
+  const [collectionsLoading, setCollectionsLoading] = useState(false);
+  const [activeCollection, setActiveCollection] = useState(null);
+  const [collectionRecipes, setCollectionRecipes] = useState([]);
+  const [collectionLoading, setCollectionLoading] = useState(false);
+  const [newCollectionName, setNewCollectionName] = useState('');
+  const [creatingCollection, setCreatingCollection] = useState(false);
+
   // Debounced search terms (avoid a fetch on every keypress)
   const [debouncedSearch, setDebouncedSearch] = useState(searchInput);
   const [debouncedIngredient, setDebouncedIngredient] = useState(ingredientInput);
@@ -381,6 +390,67 @@ const RecipeLibrary = () => {
       .finally(() => setWeekLoading(false));
   }, [activeView]);
 
+  // Fetch collections when "Collections" tab is active
+  const fetchCollections = useCallback(() => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    setCollectionsLoading(true);
+    axios.get(`${API_BASE_URL}/collections`, {
+      headers: { Authorization: `Bearer ${token}` },
+    }).then(res => {
+      setUserCollections(res.data || []);
+    }).catch(() => {})
+    .finally(() => setCollectionsLoading(false));
+  }, []);
+
+  useEffect(() => {
+    if (activeView !== 'Collections') return;
+    fetchCollections();
+  }, [activeView, fetchCollections]);
+
+  const handleViewCollection = (col) => {
+    setActiveCollection(col);
+    setCollectionLoading(true);
+    const token = localStorage.getItem('token');
+    axios.get(`${API_BASE_URL}/collections/${col.id}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    }).then(res => {
+      setCollectionRecipes(res.data.recipes || []);
+    }).catch(() => {})
+    .finally(() => setCollectionLoading(false));
+  };
+
+  const handleCreateCollection = async () => {
+    if (!newCollectionName.trim()) return;
+    setCreatingCollection(true);
+    const token = localStorage.getItem('token');
+    try {
+      await axios.post(`${API_BASE_URL}/collections`, {
+        name: newCollectionName.trim(),
+      }, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setNewCollectionName('');
+      fetchCollections();
+    } catch { /* silent */ }
+    setCreatingCollection(false);
+  };
+
+  const handleDeleteCollection = async (colId) => {
+    if (!window.confirm('Delete this collection? Recipes will not be deleted.')) return;
+    const token = localStorage.getItem('token');
+    try {
+      await axios.delete(`${API_BASE_URL}/collections/${colId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (activeCollection && activeCollection.id === colId) {
+        setActiveCollection(null);
+        setCollectionRecipes([]);
+      }
+      fetchCollections();
+    } catch { /* silent */ }
+  };
+
   // Build a map: recipe_id -> [{ dayLabel, meal_type }]
   const weekRecipeSlots = {};
   if (activeView === 'This Week') {
@@ -399,6 +469,18 @@ const RecipeLibrary = () => {
   let displayedRecipes = activeView === 'This Week'
     ? recipes.filter(r => weekRecipeIds.has(r.id))
     : recipes;
+
+  // Dietary tag filtering
+  if (activeTags.length > 0) {
+    displayedRecipes = displayedRecipes.filter(r => {
+      const recipeTags = Array.isArray(r.dietary_tags)
+        ? r.dietary_tags
+        : typeof r.dietary_tags === 'string' && r.dietary_tags.trim()
+          ? r.dietary_tags.split(',').map(t => t.trim())
+          : [];
+      return activeTags.every(tag => recipeTags.includes(tag));
+    });
+  }
 
   // Budget filtering: hide recipes over remaining calories (unless overridden)
   const overBudgetCount = hasBudget && !showOverBudget
@@ -520,8 +602,122 @@ const RecipeLibrary = () => {
         ))}
       </div>
 
+      {/* Collections view */}
+      {activeView === 'Collections' && (
+        <div className="space-y-5">
+          {/* Collection list or single collection view */}
+          {activeCollection ? (
+            <div className="space-y-5">
+              {/* Back to collections + collection name */}
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => { setActiveCollection(null); setCollectionRecipes([]); }}
+                  className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-500 hover:text-blue-600 transition-colors"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+                  </svg>
+                  Back to Collections
+                </button>
+              </div>
+              <h2 className="text-xl font-bold text-slate-800">{activeCollection.name}</h2>
+
+              {collectionLoading ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                  {Array.from({ length: 3 }).map((_, i) => <SkeletonCard key={i} />)}
+                </div>
+              ) : collectionRecipes.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16 text-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-12 h-12 text-slate-300 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+                  </svg>
+                  <p className="text-slate-500 font-medium">No recipes in this collection yet</p>
+                  <p className="text-slate-400 text-sm mt-1">Save recipes from the recipe detail page</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                  {collectionRecipes.map(recipe => (
+                    <RecipeCard
+                      key={recipe.id}
+                      recipe={recipe}
+                      addToMode={false}
+                      onSelect={() => {}}
+                      plannedSlots={null}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-5">
+              {/* Create collection row */}
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="New collection name..."
+                  value={newCollectionName}
+                  onChange={e => setNewCollectionName(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleCreateCollection()}
+                  className="flex-1 max-w-xs border border-slate-300 rounded-xl px-4 py-2.5 text-sm text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+                />
+                <button
+                  onClick={handleCreateCollection}
+                  disabled={!newCollectionName.trim() || creatingCollection}
+                  className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-semibold rounded-xl transition-colors"
+                >
+                  Create Collection
+                </button>
+              </div>
+
+              {/* Collection cards */}
+              {collectionsLoading ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                  {Array.from({ length: 3 }).map((_, i) => <SkeletonCard key={i} />)}
+                </div>
+              ) : userCollections.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16 text-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-12 h-12 text-slate-300 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+                  </svg>
+                  <p className="text-slate-500 font-medium">No collections yet</p>
+                  <p className="text-slate-400 text-sm mt-1">Create a collection to start saving recipes</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                  {userCollections.map(col => (
+                    <div
+                      key={col.id}
+                      className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-md transition-shadow duration-200 cursor-pointer"
+                    >
+                      <div className="bg-gradient-to-r from-blue-400 to-blue-500 px-4 py-3 flex items-center justify-between">
+                        <span className="text-sm font-semibold text-white">{col.recipe_count} recipe{col.recipe_count !== 1 ? 's' : ''}</span>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleDeleteCollection(col.id); }}
+                          className="text-white/70 hover:text-white transition-colors"
+                          title="Delete collection"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+                          </svg>
+                        </button>
+                      </div>
+                      <div className="p-4" onClick={() => handleViewCollection(col)}>
+                        <h3 className="text-base font-bold text-slate-800 mb-1">{col.name}</h3>
+                        <p className="text-xs text-slate-400">
+                          Created {new Date(col.created_at).toLocaleDateString()}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Search + category filters */}
-      <div className="space-y-3">
+      {activeView !== 'Collections' && <div className="space-y-3">
         {/* Search bar */}
         <div className="relative">
           <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
@@ -565,17 +761,41 @@ const RecipeLibrary = () => {
             </button>
           ))}
         </div>
-      </div>
+
+        {/* Dietary tag filter pills */}
+        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
+          {DIETARY_TAGS.map(tag => (
+            <button
+              key={tag}
+              onClick={() =>
+                setActiveTags(prev =>
+                  prev.includes(tag)
+                    ? prev.filter(t => t !== tag)
+                    : [...prev, tag]
+                )
+              }
+              className={`shrink-0 px-3 py-1 rounded-full text-xs font-medium transition-colors capitalize ${
+                activeTags.includes(tag)
+                  ? 'bg-teal-600 text-white shadow-sm'
+                  : 'bg-white border border-slate-300 text-slate-500 hover:bg-slate-50 hover:border-teal-400'
+              }`}
+            >
+              {tag}
+            </button>
+          ))}
+        </div>
+      </div>}
 
       {/* Error state */}
-      {error && (
+      {activeView !== 'Collections' && error && (
         <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl px-4 py-3">
           {error}
         </div>
       )}
 
       {/* Recipe grid */}
-      {isThisWeekLoading || loading ? (
+      {activeView !== 'Collections' && (
+      (isThisWeekLoading || loading) ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {Array.from({ length: 6 }).map((_, i) => (
             <SkeletonCard key={i} />
@@ -657,6 +877,7 @@ const RecipeLibrary = () => {
           ))}
         </div>
         </>
+      )
       )}
     </div>
   );

@@ -377,6 +377,12 @@ const RecipeDetail = () => {
   const [showModal, setShowModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
 
+  // Collections / bookmark state
+  const [collections, setCollections] = useState([]);
+  const [showCollections, setShowCollections] = useState(false);
+  const [newCollectionName, setNewCollectionName] = useState('');
+  const [creatingCollection, setCreatingCollection] = useState(false);
+
   // Reviews state
   const [reviews, setReviews] = useState([]);
   const [avgRating, setAvgRating] = useState(null);
@@ -447,6 +453,70 @@ const RecipeDetail = () => {
     fetchReviews();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
+
+  // ── Fetch collections for this recipe ───────────────────────────────────
+
+  const fetchCollections = () => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    axios.get(`${API_BASE_URL}/recipes/${id}/collections`, {
+      headers: { Authorization: `Bearer ${token}` },
+    }).then(res => {
+      setCollections(res.data || []);
+    }).catch(() => {});
+  };
+
+  useEffect(() => {
+    fetchCollections();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
+
+  const isInAnyCollection = collections.some(c => c.in_collection);
+
+  const handleToggleCollection = async (colId, currentlyIn) => {
+    const token = localStorage.getItem('token');
+    try {
+      if (currentlyIn) {
+        await axios.delete(`${API_BASE_URL}/collections/${colId}/recipes/${id}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+      } else {
+        await axios.post(`${API_BASE_URL}/collections/${colId}/recipes`, {
+          recipe_id: parseInt(id),
+        }, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+      }
+      fetchCollections();
+    } catch {
+      toast('Failed to update collection', 'error');
+    }
+  };
+
+  const handleCreateAndAdd = async () => {
+    if (!newCollectionName.trim()) return;
+    setCreatingCollection(true);
+    const token = localStorage.getItem('token');
+    try {
+      const res = await axios.post(`${API_BASE_URL}/collections`, {
+        name: newCollectionName.trim(),
+      }, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      // Add recipe to the new collection
+      await axios.post(`${API_BASE_URL}/collections/${res.data.id}/recipes`, {
+        recipe_id: parseInt(id),
+      }, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setNewCollectionName('');
+      fetchCollections();
+      toast(`Added to "${res.data.name}"`, 'success');
+    } catch {
+      toast('Failed to create collection', 'error');
+    }
+    setCreatingCollection(false);
+  };
 
   const handleSubmitReview = async () => {
     if (myRating < 1) return;
@@ -701,6 +771,80 @@ const RecipeDetail = () => {
           </svg>
           Edit
         </button>
+        {/* Bookmark / Collections button */}
+        <div className="relative">
+          <button
+            onClick={() => setShowCollections(prev => !prev)}
+            className={`inline-flex items-center gap-2 px-4 py-2 border text-sm font-semibold rounded-lg shadow-sm transition-colors ${
+              isInAnyCollection
+                ? 'border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100'
+                : 'border-slate-300 text-slate-700 hover:bg-slate-50'
+            }`}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill={isInAnyCollection ? 'currentColor' : 'none'} viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+            </svg>
+            Save
+          </button>
+
+          {/* Collections dropdown */}
+          {showCollections && (
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setShowCollections(false)} />
+              <div className="absolute right-0 top-full mt-2 w-64 bg-white border border-slate-200 rounded-xl shadow-lg z-50 overflow-hidden">
+                <div className="px-4 py-3 border-b border-slate-100">
+                  <p className="text-sm font-semibold text-slate-700">Save to collection</p>
+                </div>
+                <div className="max-h-60 overflow-y-auto">
+                  {collections.length === 0 ? (
+                    <p className="px-4 py-3 text-sm text-slate-400">No collections yet</p>
+                  ) : (
+                    collections.map(col => (
+                      <button
+                        key={col.id}
+                        onClick={() => handleToggleCollection(col.id, col.in_collection)}
+                        className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50 transition-colors text-left"
+                      >
+                        <span className={`w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${
+                          col.in_collection
+                            ? 'border-blue-500 bg-blue-500'
+                            : 'border-slate-300'
+                        }`}>
+                          {col.in_collection && (
+                            <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                            </svg>
+                          )}
+                        </span>
+                        <span className="text-sm text-slate-700">{col.name}</span>
+                      </button>
+                    ))
+                  )}
+                </div>
+                <div className="border-t border-slate-100 px-4 py-3">
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="New collection..."
+                      value={newCollectionName}
+                      onChange={e => setNewCollectionName(e.target.value)}
+                      onKeyDown={e => e.key === 'Enter' && handleCreateAndAdd()}
+                      className="flex-1 border border-slate-200 rounded-lg px-3 py-1.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                    <button
+                      onClick={handleCreateAndAdd}
+                      disabled={!newCollectionName.trim() || creatingCollection}
+                      className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors"
+                    >
+                      Add
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+
         <button
           onClick={() => setShowModal(true)}
           className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg shadow-sm transition-colors"

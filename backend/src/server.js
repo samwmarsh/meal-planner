@@ -858,17 +858,48 @@ function parseDietaryTags(keywords, category) {
   if (text.includes('dairy-free') || text.includes('dairy free')) tags.push('dairy-free');
   if (text.includes('keto')) tags.push('keto');
   if (text.includes('paleo')) tags.push('paleo');
+  if (text.includes('low gi') || text.includes('low glycemic') || text.includes('low glycaemic') || text.includes('low-gi') || text.includes('pcos')) tags.push('low-glycemic');
+  if (text.includes('high protein') || text.includes('high-protein') || text.includes('protein rich')) tags.push('high-protein');
+  if (text.includes('low carb') || text.includes('low-carb')) tags.push('low-carb');
   return tags;
 }
 
 function parseIngredient(str) {
-  if (!str) return { quantity: null, unit: null, name: str };
+  if (!str) return { quantity: null, unit: null, name: str, notes: '' };
   // Normalise unicode fractions
   let s = str.trim()
     .replace(/½/g, '0.5').replace(/¼/g, '0.25').replace(/¾/g, '0.75')
-    .replace(/⅓/g, '0.333').replace(/⅔/g, '0.667');
+    .replace(/⅓/g, '0.333').replace(/⅔/g, '0.667')
+    .replace(/⅛/g, '0.125').replace(/⅜/g, '0.375').replace(/⅝/g, '0.625').replace(/⅞/g, '0.875');
 
-  // Fix stuck number+unit patterns: "400g" → "400 g", "250ml" → "250 ml", "1small" → "1 small"
+  // Strip "to taste", "to serve", "as needed", "for garnish" from the string (save for notes)
+  const trailingPhrases = /,?\s*(to taste|to serve|as needed|for garnish|for serving|optional|or to taste)\s*$/i;
+  let extraNotes = '';
+  const trailingMatch = s.match(trailingPhrases);
+  if (trailingMatch) {
+    extraNotes = trailingMatch[1];
+    s = s.replace(trailingPhrases, '').trim();
+  }
+
+  // Handle parenthetical quantities: "1 (400g) tin" → extract but keep outer quantity
+  // Also "1 (14oz) can" pattern
+  const parenQty = s.match(/^(\d+(?:\.\d+)?)\s*\((\d+(?:\.\d+)?)\s*(g|kg|ml|l|oz|lb|lbs)\)\s*/i);
+  if (parenQty) {
+    // Keep the outer quantity and unit (e.g., "1 tin"), store paren info in notes
+    const parenNote = `${parenQty[2]}${parenQty[3]}`;
+    s = s.replace(parenQty[0], parenQty[1] + ' ');
+    extraNotes = extraNotes ? `${parenNote}, ${extraNotes}` : parenNote;
+  }
+
+  // Handle "a pinch of", "a splash of", "a handful of"
+  const nonNumeric = s.match(/^(a|an)\s+(pinch|splash|handful|dash|drizzle|knob|sprig|bunch)\s+(?:of\s+)?/i);
+  if (nonNumeric) {
+    const unit = nonNumeric[2].toLowerCase();
+    const name = s.slice(nonNumeric[0].length).replace(/^,\s*/, '').trim();
+    return { quantity: 1, unit, name: name || str, notes: extraNotes };
+  }
+
+  // Fix stuck number+unit patterns: "400g" → "400 g", "250ml" → "250 ml"
   s = s.replace(/^(\d+(?:\.\d+)?)(g|kg|ml|l|oz|lb|lbs|cup|cups|tbsp|tsp|can|cans|tin|tins)\b/i, '$1 $2');
   // Fix stuck number+word: "1small" → "1 small"
   s = s.replace(/^(\d+(?:\.\d+)?)([a-zA-Z])/, '$1 $2');
@@ -876,15 +907,23 @@ function parseIngredient(str) {
   const UNITS = ['g','kg','ml','l','oz','lb','lbs','cup','cups','tbsp','tsp','tablespoon',
                  'tablespoons','teaspoon','teaspoons','piece','pieces','clove','cloves',
                  'slice','slices','bunch','handful','pinch','can','cans','tin','tins',
-                 'pouch','packet','bag','jar','bottle'];
+                 'pouch','packet','bag','jar','bottle','sprig','sprigs','head','heads',
+                 'stalk','stalks','rasher','rashers','fillet','fillets'];
+
+  const SIZE_WORDS = new Set(['large', 'small', 'medium', 'big', 'thin', 'thick', 'heaped', 'level', 'rounded', 'generous']);
 
   const tokens = s.split(/\s+/);
   let quantity = null;
   let unit = null;
   let nameStart = 0;
 
+  // Handle range quantities: "2-3" → take the lower bound
+  if (tokens.length >= 1 && /^\d+(?:\.\d+)?-\d+(?:\.\d+)?$/.test(tokens[0])) {
+    quantity = parseFloat(tokens[0].split('-')[0]);
+    nameStart = 1;
+  }
   // Handle mixed numbers e.g. "1 1/2"
-  if (tokens.length >= 2 && /^\d+$/.test(tokens[0]) && /^\d+\/\d+$/.test(tokens[1])) {
+  else if (tokens.length >= 2 && /^\d+$/.test(tokens[0]) && /^\d+\/\d+$/.test(tokens[1])) {
     const [num, den] = tokens[1].split('/');
     quantity = parseInt(tokens[0]) + parseInt(num) / parseInt(den);
     nameStart = 2;
@@ -898,7 +937,7 @@ function parseIngredient(str) {
     nameStart = 1;
   }
 
-  // Check for unit — also handle "400g" patterns where unit is attached to a number in subsequent tokens
+  // Check for unit
   if (nameStart < tokens.length) {
     const nextToken = tokens[nameStart].toLowerCase();
     if (UNITS.includes(nextToken)) {
@@ -915,8 +954,22 @@ function parseIngredient(str) {
     }
   }
 
-  const name = tokens.slice(nameStart).join(' ').replace(/^,\s*/, '') || str;
-  return { quantity: quantity || null, unit: unit || null, name };
+  // Move size descriptors (large, small, medium) to notes
+  if (nameStart < tokens.length && SIZE_WORDS.has(tokens[nameStart].toLowerCase())) {
+    const sizeWord = tokens[nameStart];
+    nameStart++;
+    extraNotes = extraNotes ? `${sizeWord}, ${extraNotes}` : sizeWord;
+  }
+
+  // Strip leading "of" from name: "of salt" → "salt"
+  if (nameStart < tokens.length && tokens[nameStart].toLowerCase() === 'of') {
+    nameStart++;
+  }
+
+  // Strip trailing parenthetical from name: "stock (about 2 cups)" → "stock"
+  let name = tokens.slice(nameStart).join(' ').replace(/^,\s*/, '').replace(/\s*\(.*?\)\s*$/, '').trim() || str;
+
+  return { quantity: quantity || null, unit: unit || null, name, notes: extraNotes };
 }
 
 // For a step instruction, find which ingredients are referenced and at what quantity.
@@ -1728,6 +1781,136 @@ app.delete('/strava/disconnect', authenticateToken, async (req, res) => {
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: 'Failed to disconnect Strava', details: err.message });
+  }
+});
+
+// ── Recipe Collections ──────────────────────────────────────────────────────
+
+// List user's collections with recipe count
+app.get('/collections', authenticateToken, async (req, res) => {
+  try {
+    const { rows } = await db.query(
+      `SELECT rc.id, rc.name, rc.created_at, COUNT(rci.id)::int AS recipe_count
+       FROM recipe_collections rc
+       LEFT JOIN recipe_collection_items rci ON rci.collection_id = rc.id
+       WHERE rc.user_id = $1
+       GROUP BY rc.id
+       ORDER BY rc.name`,
+      [req.user.id]
+    );
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch collections', details: err.message });
+  }
+});
+
+// Get a single collection with its recipes
+app.get('/collections/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { rows: colRows } = await db.query(
+      'SELECT * FROM recipe_collections WHERE id = $1 AND user_id = $2', [id, req.user.id]
+    );
+    if (colRows.length === 0) return res.status(404).json({ error: 'Collection not found' });
+    const { rows: recipes } = await db.query(
+      `SELECT r.id, r.title, r.description, r.category, r.servings, r.image_url,
+              r.calories_per_serving, r.protein_per_serving, r.carbs_per_serving, r.fat_per_serving,
+              r.dietary_tags, r.prep_time_mins, r.cook_time_mins, rci.added_at
+       FROM recipe_collection_items rci
+       JOIN recipes r ON r.id = rci.recipe_id
+       WHERE rci.collection_id = $1
+       ORDER BY rci.added_at DESC`,
+      [id]
+    );
+    res.json({ ...colRows[0], recipes });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch collection', details: err.message });
+  }
+});
+
+// Create a collection
+app.post('/collections', authenticateToken, async (req, res) => {
+  try {
+    const { name } = req.body;
+    if (!name || !name.trim()) return res.status(400).json({ error: 'Collection name is required' });
+    const { rows } = await db.query(
+      'INSERT INTO recipe_collections (user_id, name) VALUES ($1, $2) RETURNING *',
+      [req.user.id, name.trim()]
+    );
+    res.status(201).json(rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to create collection', details: err.message });
+  }
+});
+
+// Delete a collection
+app.delete('/collections/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { rowCount } = await db.query(
+      'DELETE FROM recipe_collections WHERE id = $1 AND user_id = $2', [id, req.user.id]
+    );
+    if (rowCount === 0) return res.status(404).json({ error: 'Collection not found' });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to delete collection', details: err.message });
+  }
+});
+
+// Add recipe to collection
+app.post('/collections/:id/recipes', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { recipe_id } = req.body;
+    // Verify collection belongs to user
+    const { rows: colRows } = await db.query(
+      'SELECT id FROM recipe_collections WHERE id = $1 AND user_id = $2', [id, req.user.id]
+    );
+    if (colRows.length === 0) return res.status(404).json({ error: 'Collection not found' });
+    await db.query(
+      'INSERT INTO recipe_collection_items (collection_id, recipe_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+      [id, recipe_id]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to add recipe to collection', details: err.message });
+  }
+});
+
+// Remove recipe from collection
+app.delete('/collections/:id/recipes/:recipeId', authenticateToken, async (req, res) => {
+  try {
+    const { id, recipeId } = req.params;
+    // Verify collection belongs to user
+    const { rows: colRows } = await db.query(
+      'SELECT id FROM recipe_collections WHERE id = $1 AND user_id = $2', [id, req.user.id]
+    );
+    if (colRows.length === 0) return res.status(404).json({ error: 'Collection not found' });
+    await db.query(
+      'DELETE FROM recipe_collection_items WHERE collection_id = $1 AND recipe_id = $2',
+      [id, recipeId]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to remove recipe from collection', details: err.message });
+  }
+});
+
+// Get which collections a recipe is in (for the bookmark UI)
+app.get('/recipes/:id/collections', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { rows } = await db.query(
+      `SELECT rc.id, rc.name, (rci.id IS NOT NULL) AS in_collection
+       FROM recipe_collections rc
+       LEFT JOIN recipe_collection_items rci ON rci.collection_id = rc.id AND rci.recipe_id = $1
+       WHERE rc.user_id = $2
+       ORDER BY rc.name`,
+      [id, req.user.id]
+    );
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch recipe collections', details: err.message });
   }
 });
 

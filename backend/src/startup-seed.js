@@ -149,6 +149,24 @@ async function ensureTables() {
       created_at TIMESTAMP DEFAULT NOW()
     )
   `);
+  // Recipe collections tables
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS recipe_collections (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+      name VARCHAR(100) NOT NULL,
+      created_at TIMESTAMP DEFAULT NOW()
+    )
+  `);
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS recipe_collection_items (
+      id SERIAL PRIMARY KEY,
+      collection_id INTEGER REFERENCES recipe_collections(id) ON DELETE CASCADE,
+      recipe_id INTEGER REFERENCES recipes(id) ON DELETE CASCADE,
+      added_at TIMESTAMP DEFAULT NOW(),
+      UNIQUE(collection_id, recipe_id)
+    )
+  `);
 }
 
 async function seedRecipes() {
@@ -238,6 +256,15 @@ async function runStartupSeed() {
     await seedExercises();
     // Ensure sam is admin
     await db.query(`UPDATE users SET role = 'admin' WHERE username = 'sam' AND (role IS NULL OR role = 'user')`);
+    // Seed default Favourites collection for sam
+    const { rows: existingCol } = await db.query(
+      `SELECT id FROM recipe_collections WHERE user_id = (SELECT id FROM users WHERE username = 'sam') AND name = 'Favourites'`
+    );
+    if (existingCol.length === 0) {
+      await db.query(
+        `INSERT INTO recipe_collections (user_id, name) SELECT id, 'Favourites' FROM users WHERE username = 'sam'`
+      );
+    }
     console.log('[startup-seed] Done.');
   } catch (err) {
     console.error('[startup-seed] Error:', err.message);

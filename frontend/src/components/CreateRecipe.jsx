@@ -7,6 +7,8 @@ const slugify = (title) =>
 
 const CATEGORIES = ['Breakfast', 'Lunch', 'Dinner', 'Snacks'];
 
+const DIETARY_TAGS = ['vegan', 'vegetarian', 'gluten-free', 'dairy-free', 'keto', 'low-glycemic', 'high-protein', 'low-carb'];
+
 const UNITS = ['g', 'kg', 'ml', 'l', 'tsp', 'tbsp', 'cup', 'oz', 'lb', 'piece', 'pinch', 'bunch', 'clove', 'slice', ''];
 
 const emptyIngredient = () => ({
@@ -39,6 +41,8 @@ const CreateRecipe = () => {
 
   const [stepSection, setStepSection] = useState('Method');
   const [steps, setSteps] = useState([emptyStep()]);
+
+  const [selectedTags, setSelectedTags] = useState([]);
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -95,6 +99,7 @@ const CreateRecipe = () => {
       protein_per_serving: parseFloat(form.protein_per_serving) || 0,
       carbs_per_serving: parseFloat(form.carbs_per_serving) || 0,
       fat_per_serving: parseFloat(form.fat_per_serving) || 0,
+      dietary_tags: selectedTags,
       image_url: form.image_url.trim() || null,
       ingredients: ingredients
         .filter((ing) => ing.name.trim())
@@ -232,6 +237,33 @@ const CreateRecipe = () => {
               placeholder="https://example.com/photo.jpg"
               className={inputCls}
             />
+          </div>
+
+          {/* Dietary tags */}
+          <div>
+            <label className={labelCls}>Dietary Tags</label>
+            <div className="flex flex-wrap gap-2">
+              {DIETARY_TAGS.map((tag) => (
+                <button
+                  key={tag}
+                  type="button"
+                  onClick={() =>
+                    setSelectedTags((prev) =>
+                      prev.includes(tag)
+                        ? prev.filter((t) => t !== tag)
+                        : [...prev, tag]
+                    )
+                  }
+                  className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                    selectedTags.includes(tag)
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  {tag}
+                </button>
+              ))}
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
