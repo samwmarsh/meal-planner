@@ -22,7 +22,7 @@ router.post('/register', async (req, res) => {
 });
 
 router.post('/login', async (req, res) => {
-  const { username, password } = req.body;
+  const { username, password, remember } = req.body;
   try {
     const result = await db.query(
       'SELECT * FROM users WHERE username = $1',
@@ -30,7 +30,8 @@ router.post('/login', async (req, res) => {
     );
     const user = result.rows[0];
     if (user && await bcrypt.compare(password, user.password_hash)) {
-      const token = jwt.sign({ id: user.id }, JWT_SECRET, { expiresIn: '7d' });
+      const expiresIn = remember ? '30d' : '7d';
+      const token = jwt.sign({ id: user.id, role: user.role || 'user' }, JWT_SECRET, { expiresIn });
       res.json({ token });
     } else {
       res.status(401).send('Invalid credentials');

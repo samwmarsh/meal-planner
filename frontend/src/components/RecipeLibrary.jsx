@@ -102,16 +102,42 @@ const RecipeCard = ({ recipe, addToMode, onSelect, plannedSlots }) => {
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-md transition-shadow duration-200 flex flex-col">
-      {/* Colour header band */}
-      <div className={`${headerBarClass} px-4 py-3 flex items-center justify-between`}>
-        {category ? (
-          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${badgeClass}`}>
-            {category}
-          </span>
-        ) : (
-          <span />
-        )}
-      </div>
+      {/* Recipe image or colour header band */}
+      {recipe.image_url ? (
+        <div className="relative">
+          <img
+            src={recipe.image_url}
+            alt={recipe.title}
+            className="w-full h-40 object-cover rounded-t-xl"
+            loading="lazy"
+            onError={(e) => { e.target.style.display = 'none'; e.target.nextElementSibling && (e.target.nextElementSibling.style.display = 'flex'); }}
+          />
+          <div className={`${headerBarClass} px-4 py-3 items-center justify-between`} style={{ display: 'none' }}>
+            {category ? (
+              <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${badgeClass}`}>
+                {category}
+              </span>
+            ) : (
+              <span />
+            )}
+          </div>
+          {category && (
+            <span className={`absolute top-2 left-2 text-xs font-semibold px-2 py-0.5 rounded-full ${badgeClass} bg-opacity-90`}>
+              {category}
+            </span>
+          )}
+        </div>
+      ) : (
+        <div className={`${headerBarClass} px-4 py-3 flex items-center justify-between`}>
+          {category ? (
+            <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${badgeClass}`}>
+              {category}
+            </span>
+          ) : (
+            <span />
+          )}
+        </div>
+      )}
 
       {/* Card body */}
       <div className="p-4 flex flex-col flex-1">

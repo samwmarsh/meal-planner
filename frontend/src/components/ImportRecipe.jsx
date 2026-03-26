@@ -131,6 +131,17 @@ const ImportRecipe = () => {
             <p className="text-sm font-semibold text-green-700">Recipe imported successfully!</p>
           </div>
 
+          {/* Imported recipe image */}
+          {importedRecipe.image_url && (
+            <img
+              src={importedRecipe.image_url}
+              alt={importedRecipe.title}
+              className="w-full h-48 object-cover"
+              loading="lazy"
+              onError={(e) => e.target.style.display = 'none'}
+            />
+          )}
+
           <div className="p-5 space-y-4">
             {/* Title + category */}
             <div className="flex items-start justify-between gap-3">

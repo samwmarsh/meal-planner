@@ -7,6 +7,14 @@ const runStartupSeed = require('./startup-seed');
 const authRoutes = require('./auth');
 const { authenticateToken } = require('./middleware/auth');
 
+// Admin-only middleware — must come after authenticateToken
+function requireAdmin(req, res, next) {
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+  next();
+}
+
 const app = express();
 const PORT = process.env.PORT || 5000;
 
@@ -613,7 +621,7 @@ app.get('/recipes', async (req, res) => {
     const { category, search, tags, ingredient } = req.query;
     let query = `SELECT DISTINCT r.id, r.title, r.description, r.servings, r.prep_time_mins, r.cook_time_mins,
                         r.category, r.dietary_tags, r.calories_per_serving, r.protein_per_serving,
-                        r.carbs_per_serving, r.fat_per_serving, r.status, r.source_url, r.created_at
+                        r.carbs_per_serving, r.fat_per_serving, r.status, r.source_url, r.image_url, r.created_at
                  FROM recipes r`;
     const params = [];
     if (ingredient) {
@@ -657,7 +665,7 @@ app.post('/recipes', authenticateToken, async (req, res) => {
     const {
       title, description, servings, prep_time_mins, cook_time_mins, category,
       dietary_tags, calories_per_serving, protein_per_serving, carbs_per_serving,
-      fat_per_serving, source_url, ingredients = [], steps = []
+      fat_per_serving, source_url, image_url, ingredients = [], steps = []
     } = req.body;
 
     if (!title) return res.status(400).json({ error: 'title is required' });
@@ -665,13 +673,13 @@ app.post('/recipes', authenticateToken, async (req, res) => {
     const { rows: recipeRows } = await db.query(
       `INSERT INTO recipes (title, description, servings, prep_time_mins, cook_time_mins, category,
          dietary_tags, calories_per_serving, protein_per_serving, carbs_per_serving, fat_per_serving,
-         status, source_url, author_id)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'personal',$12,$13)
+         status, source_url, image_url, author_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'personal',$12,$13,$14)
        RETURNING id`,
       [title, description || null, servings || 1, prep_time_mins || 0, cook_time_mins || 0,
        category || 'Dinner', dietary_tags || [], calories_per_serving || 0,
        protein_per_serving || 0, carbs_per_serving || 0, fat_per_serving || 0,
-       source_url || null, req.user.id]
+       source_url || null, image_url || null, req.user.id]
     );
     const recipeId = recipeRows[0].id;
 
@@ -709,6 +717,21 @@ app.post('/recipes', authenticateToken, async (req, res) => {
   }
 });
 
+// Submit personal recipe for community approval
+app.post('/recipes/:id/submit', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { rows } = await db.query('SELECT author_id, status FROM recipes WHERE id = $1', [id]);
+    if (rows.length === 0) return res.status(404).json({ error: 'Recipe not found' });
+    if (rows[0].author_id !== req.user.id) return res.status(403).json({ error: 'You can only submit your own recipes' });
+    if (rows[0].status !== 'personal') return res.status(400).json({ error: 'Only personal recipes can be submitted for approval' });
+    await db.query(`UPDATE recipes SET status = 'pending', updated_at = NOW() WHERE id = $1`, [id]);
+    res.json({ message: 'Recipe submitted for community approval' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to submit recipe', details: err.message });
+  }
+});
+
 // Get single recipe with ingredients and steps
 app.get('/recipes/:id', async (req, res) => {
   try {
@@ -728,12 +751,17 @@ app.get('/recipes/:id', async (req, res) => {
   }
 });
 
-// Update recipe metadata
+// Update recipe metadata (author or admin only)
 app.patch('/recipes/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
+    const { rows: existing } = await db.query('SELECT author_id FROM recipes WHERE id = $1', [id]);
+    if (existing.length === 0) return res.status(404).json({ error: 'Recipe not found' });
+    if (existing[0].author_id !== req.user.id && req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'You can only edit your own recipes' });
+    }
     const { title, category, description, servings, prep_time_mins, cook_time_mins,
-            calories_per_serving, protein_per_serving, carbs_per_serving, fat_per_serving } = req.body;
+            calories_per_serving, protein_per_serving, carbs_per_serving, fat_per_serving, image_url } = req.body;
     const { rows } = await db.query(
       `UPDATE recipes SET
          title                = COALESCE($1, title),
@@ -746,13 +774,14 @@ app.patch('/recipes/:id', authenticateToken, async (req, res) => {
          protein_per_serving  = COALESCE($8, protein_per_serving),
          carbs_per_serving    = COALESCE($9, carbs_per_serving),
          fat_per_serving      = COALESCE($10, fat_per_serving),
+         image_url            = COALESCE($11, image_url),
          updated_at           = NOW()
-       WHERE id = $11
+       WHERE id = $12
        RETURNING *`,
       [title ?? null, category ?? null, description ?? null,
        servings ?? null, prep_time_mins ?? null, cook_time_mins ?? null,
        calories_per_serving ?? null, protein_per_serving ?? null,
-       carbs_per_serving ?? null, fat_per_serving ?? null, id]
+       carbs_per_serving ?? null, fat_per_serving ?? null, image_url ?? null, id]
     );
     if (rows.length === 0) return res.status(404).json({ error: 'Recipe not found' });
     res.json(rows[0]);
@@ -780,6 +809,19 @@ app.delete('/recipes/:id', authenticateToken, async (req, res) => {
 });
 
 // ── Recipe import helpers ─────────────────────────────────────────────────────
+
+function extractRecipeImage(schema) {
+  if (!schema || !schema.image) return null;
+  const img = schema.image;
+  if (typeof img === 'string') return img;
+  if (Array.isArray(img)) {
+    const first = img[0];
+    if (typeof first === 'string') return first;
+    if (first && first.url) return first.url;
+  }
+  if (img.url) return img.url;
+  return null;
+}
 
 function parseISO8601Duration(str) {
   if (!str) return null;
@@ -1050,16 +1092,17 @@ app.post('/recipes/import', authenticateToken, async (req, res) => {
     const proteinPerServing = parseNutritionValue(nutrition.proteinContent);
     const carbsPerServing = parseNutritionValue(nutrition.carbohydrateContent);
     const fatPerServing = parseNutritionValue(nutrition.fatContent);
+    const imageUrl = extractRecipeImage(schema);
 
     const { rows: recipeRows } = await db.query(
       `INSERT INTO recipes (title, description, servings, prep_time_mins, cook_time_mins, category,
          dietary_tags, calories_per_serving, protein_per_serving, carbs_per_serving, fat_per_serving,
-         status, source_url, author_id)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'imported',$12,$13)
+         status, source_url, image_url, author_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'imported',$12,$13,$14)
        RETURNING id`,
       [title, description, servings, prepTimeMins || 0, cookTimeMins || 0, category,
        dietaryTags, caloriesPerServing || 0, proteinPerServing || 0,
-       carbsPerServing || 0, fatPerServing || 0, url, req.user.id]
+       carbsPerServing || 0, fatPerServing || 0, url, imageUrl, req.user.id]
     );
     const recipeId = recipeRows[0].id;
 
@@ -1685,6 +1728,51 @@ app.delete('/strava/disconnect', authenticateToken, async (req, res) => {
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: 'Failed to disconnect Strava', details: err.message });
+  }
+});
+
+// ── Admin: Recipe approval queue ────────────────────────────────────────────
+app.get('/admin/recipes/pending', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { rows } = await db.query(
+      `SELECT r.*, u.username AS author_name
+       FROM recipes r
+       LEFT JOIN users u ON u.id = r.author_id
+       WHERE r.status = 'pending'
+       ORDER BY r.created_at ASC`
+    );
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch pending recipes', details: err.message });
+  }
+});
+
+app.put('/admin/recipes/:id/approve', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { rows } = await db.query(
+      `UPDATE recipes SET status = 'community', updated_at = NOW() WHERE id = $1 AND status = 'pending' RETURNING id, title`,
+      [id]
+    );
+    if (rows.length === 0) return res.status(404).json({ error: 'Recipe not found or not pending' });
+    res.json({ message: 'Recipe approved', recipe: rows[0] });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to approve recipe', details: err.message });
+  }
+});
+
+app.put('/admin/recipes/:id/reject', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+    const { rows } = await db.query(
+      `UPDATE recipes SET status = 'personal', updated_at = NOW() WHERE id = $1 AND status = 'pending' RETURNING id, title`,
+      [id]
+    );
+    if (rows.length === 0) return res.status(404).json({ error: 'Recipe not found or not pending' });
+    res.json({ message: 'Recipe rejected', recipe: rows[0], reason: reason || 'No reason given' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to reject recipe', details: err.message });
   }
 });
 

@@ -5,6 +5,7 @@ CREATE TABLE IF NOT EXISTS users (
   id SERIAL PRIMARY KEY,
   username VARCHAR(50) UNIQUE NOT NULL,
   password_hash VARCHAR(255) NOT NULL,
+  role VARCHAR(20) DEFAULT 'user',
   created_at TIMESTAMP DEFAULT NOW()
 );
 
@@ -60,9 +61,9 @@ CREATE TABLE IF NOT EXISTS daily_logs (
   UNIQUE(user_id, date)
 );
 
--- Dev seed user (username: sam, password: sam)
-INSERT INTO users (username, password_hash) VALUES
-  ('sam', '$2b$10$9GxSG8o/SOd6F9P/6PRqIOSQoeSPeEPAqQdjtakrKL.92mMkSokja')
+-- Dev seed user (username: sam, password: sam, admin role)
+INSERT INTO users (username, password_hash, role) VALUES
+  ('sam', '$2b$10$9GxSG8o/SOd6F9P/6PRqIOSQoeSPeEPAqQdjtakrKL.92mMkSokja', 'admin')
 ON CONFLICT DO NOTHING;
 
 -- Sample meal library
@@ -101,6 +102,7 @@ CREATE TABLE IF NOT EXISTS recipes (
   fat_per_serving NUMERIC DEFAULT 0,
   status VARCHAR(20) DEFAULT 'community',
   source_url TEXT,
+  image_url TEXT,
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW()
 );

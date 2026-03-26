@@ -207,6 +207,7 @@ const EditRecipeModal = ({ recipe, onClose, onSaved }) => {
     protein_per_serving:  recipe.protein_per_serving || 0,
     carbs_per_serving:    recipe.carbs_per_serving || 0,
     fat_per_serving:      recipe.fat_per_serving || 0,
+    image_url:            recipe.image_url || '',
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -231,6 +232,7 @@ const EditRecipeModal = ({ recipe, onClose, onSaved }) => {
           protein_per_serving:  parseFloat(form.protein_per_serving) || 0,
           carbs_per_serving:    parseFloat(form.carbs_per_serving) || 0,
           fat_per_serving:      parseFloat(form.fat_per_serving) || 0,
+          image_url:            form.image_url.trim() || null,
         }),
       });
       if (!res.ok) { const d = await res.json(); throw new Error(d.error || 'Failed to save'); }
@@ -288,6 +290,11 @@ const EditRecipeModal = ({ recipe, onClose, onSaved }) => {
             <label className={labelCls}>Description</label>
             <textarea name="description" value={form.description} onChange={handleChange} rows={3}
               className={`${inputCls} resize-none`} />
+          </div>
+
+          <div>
+            <label className={labelCls}>Image URL</label>
+            <input name="image_url" value={form.image_url} onChange={handleChange} placeholder="https://example.com/photo.jpg" className={inputCls} />
           </div>
 
           <div>
@@ -569,6 +576,31 @@ const RecipeDetail = () => {
     }
   };
 
+  // ── Submit for community review ──────────────────────────────────────────
+
+  const handleSubmitForReview = async () => {
+    const token = localStorage.getItem('token');
+    try {
+      await axios.post(`${API_BASE_URL}/recipes/${id}/submit`, {}, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      toast('Recipe submitted for community approval!', 'success');
+      fetchRecipe();
+    } catch (err) {
+      toast(err.response?.data?.error || 'Failed to submit recipe for review.', 'error');
+    }
+  };
+
+  const canSubmitForReview = () => {
+    if (!recipe || recipe.status !== 'personal') return false;
+    const token = localStorage.getItem('token');
+    if (!token) return false;
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      return recipe.author_id === payload.id;
+    } catch { return false; }
+  };
+
   // ── Loading state ─────────────────────────────────────────────────────────
 
   if (loading) {
@@ -635,6 +667,22 @@ const RecipeDetail = () => {
         </Link>
 
         <div className="flex items-center gap-2">
+        {canSubmitForReview() && (
+          <button
+            onClick={handleSubmitForReview}
+            className="inline-flex items-center gap-2 px-4 py-2 border border-emerald-300 dark:border-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 text-sm font-semibold rounded-lg shadow-sm transition-colors"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 19.5v-15m0 0l-6.75 6.75M12 4.5l6.75 6.75" />
+            </svg>
+            Submit for Community Review
+          </button>
+        )}
+        {recipe.status === 'pending' && (
+          <span className="inline-flex items-center px-3 py-1.5 text-xs font-semibold text-amber-700 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/30 rounded-full">
+            Pending Review
+          </span>
+        )}
         <button
           onClick={handleDelete}
           className="inline-flex items-center gap-2 px-4 py-2 border border-red-300 hover:bg-red-50 text-red-600 text-sm font-semibold rounded-lg shadow-sm transition-colors"
@@ -664,6 +712,17 @@ const RecipeDetail = () => {
         </button>
         </div>
       </div>
+
+      {/* Hero image */}
+      {recipe.image_url && (
+        <img
+          src={recipe.image_url}
+          alt={recipe.title}
+          className="w-full h-64 object-cover rounded-xl mb-6"
+          loading="lazy"
+          onError={(e) => e.target.style.display = 'none'}
+        />
+      )}
 
       {/* Two-column layout */}
       <div className="grid grid-cols-1 lg:grid-cols-[380px_1fr] gap-8 items-start">

@@ -7,10 +7,11 @@ This file defines how Claude should operate in a structured review → plan → 
 ## The Loop
 
 ```
-SPEC → Review → Plan → Build → QA → Compare with Spec → Iterate
+SPEC → Review → Plan → Build → Security Review → QA → UI Review → Compare with Spec → Iterate → Commit
 ```
 
 Each phase has a defined role and output. Phases can be skipped or repeated as needed.
+Use agents to parallelise independent work wherever possible.
 
 ---
 
@@ -52,7 +53,23 @@ Each phase has a defined role and output. Phases can be skipped or repeated as n
 
 ---
 
-### 4. QA
+### 4. SECURITY REVIEW
+**Trigger:** `/security` or after BUILD completes
+**Goal:** Identify security vulnerabilities in new/changed code before shipping.
+
+- Review all new routes for authentication/authorisation checks
+- Check for SQL injection (parameterised queries only)
+- Check for XSS (user input sanitisation)
+- Verify file upload safety (size limits, type validation, path traversal)
+- Verify JWT handling (expiry, secret strength, token scope)
+- Check CORS configuration
+- Check for sensitive data leakage in API responses (password hashes, tokens)
+- Check for IDOR (insecure direct object references) — ensure users can only access their own data
+- Output: pass/fail per check with specific file:line references for any issues
+
+---
+
+### 5. QA
 **Trigger:** `/qa` or "check your work"
 **Goal:** Verify the build is correct and complete.
 
@@ -60,11 +77,28 @@ Each phase has a defined role and output. Phases can be skipped or repeated as n
 - Check: does the code match the plan? Does it match the spec?
 - Check: are there syntax errors, missing imports, broken references?
 - Check: are there any regressions to existing functionality?
+- Build Docker containers and verify they start without errors
+- Hit new/changed API endpoints with curl and verify correct JSON responses
 - Output: pass/fail for each check, with line references for any issues
 
 ---
 
-### 5. COMPARE WITH SPEC
+### 6. UI REVIEW
+**Trigger:** `/ui-review` or after QA passes
+**Goal:** Verify the frontend renders and behaves correctly.
+
+- Check all new/modified components render without console errors
+- Verify responsive layout (mobile + desktop breakpoints)
+- Verify dark mode compatibility
+- Check loading states and empty states
+- Verify form validation and error messages
+- Check navigation flows (links, redirects, back buttons)
+- Verify toast notifications fire on success/error
+- Output: pass/fail per check with screenshots or descriptions of issues
+
+---
+
+### 7. COMPARE WITH SPEC
 **Trigger:** `/spec-check` or "compare with spec"
 **Goal:** Verify the current implementation matches `SPEC.md`.
 
@@ -74,13 +108,24 @@ Each phase has a defined role and output. Phases can be skipped or repeated as n
 
 ---
 
-### 6. ITERATE
+### 8. ITERATE
 **Trigger:** After QA or spec-check reveals issues
 **Goal:** Fix only what failed. Return to BUILD phase with a minimal targeted plan.
 
 - Address only the failing checks
 - Do not re-build passing items
 - Re-run QA after changes
+
+---
+
+### 9. COMMIT
+**Trigger:** `/commit` or after QA + UI Review pass
+**Goal:** Create a clean commit on main with all changes.
+
+- Run `git status` and `git diff` to confirm what's staged
+- Write a clear commit message summarising the feature(s) added
+- Commit to main
+- Do NOT push unless explicitly asked
 
 ---
 
@@ -133,6 +178,9 @@ After any source code change, the running containers must be updated. Use the mi
 | `/review` | Review current codebase state |
 | `/plan` | Propose implementation plan |
 | `/build` | Execute the plan |
-| `/qa` | Verify the build |
+| `/security` | Security review of changed code |
+| `/qa` | Verify the build (endpoints, errors, regressions) |
+| `/ui-review` | Verify UI renders and behaves correctly |
 | `/spec-check` | Compare implementation vs SPEC.md |
-| `/loop` | Run Review → Plan → Build → QA in sequence |
+| `/commit` | Commit changes to main |
+| `/loop` | Run full loop: Review → Plan → Build → Security → QA → UI Review → Commit |

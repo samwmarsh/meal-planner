@@ -31,6 +31,7 @@ const CreateRecipe = () => {
     protein_per_serving: '',
     carbs_per_serving: '',
     fat_per_serving: '',
+    image_url: '',
   });
 
   const [ingredientSection, setIngredientSection] = useState('Ingredients');
@@ -94,6 +95,7 @@ const CreateRecipe = () => {
       protein_per_serving: parseFloat(form.protein_per_serving) || 0,
       carbs_per_serving: parseFloat(form.carbs_per_serving) || 0,
       fat_per_serving: parseFloat(form.fat_per_serving) || 0,
+      image_url: form.image_url.trim() || null,
       ingredients: ingredients
         .filter((ing) => ing.name.trim())
         .map((ing, idx) => ({
@@ -218,6 +220,17 @@ const CreateRecipe = () => {
               rows={3}
               placeholder="A short description of the recipe..."
               className={`${inputCls} resize-none`}
+            />
+          </div>
+
+          <div>
+            <label className={labelCls}>Image URL</label>
+            <input
+              name="image_url"
+              value={form.image_url}
+              onChange={handleChange}
+              placeholder="https://example.com/photo.jpg"
+              className={inputCls}
             />
           </div>
 

@@ -77,10 +77,10 @@ Optional:
 ## Database Schema
 
 ```sql
-users          (id, username, password_hash, created_at)
+users          (id, username, password_hash, role, created_at)
 user_profiles  (user_id, date_of_birth, sex, height_cm, activity_level, goal, ...)
 meals          (id, name, type)                          -- type: Breakfast|Lunch|Dinner|Snacks
-recipes        (id, author_id, title, category, servings, macros, source_url, ...)
+recipes        (id, author_id, title, category, servings, macros, source_url, image_url, ...)
 recipe_ingredients (id, recipe_id, section, position, quantity, unit, name, notes)
 recipe_steps   (id, recipe_id, section, position, instruction, ingredient_refs)
 meal_plans     (id, user_id, date, meal_type, meal_id, recipe_id, servings)

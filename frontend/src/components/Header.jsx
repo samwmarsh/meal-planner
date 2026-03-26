@@ -1,7 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 
-const tabs = [
+function getTokenPayload() {
+  const token = localStorage.getItem('token');
+  if (!token) return null;
+  try {
+    return JSON.parse(atob(token.split('.')[1]));
+  } catch { return null; }
+}
+
+const baseTabs = [
   { label: 'Home', to: '/' },
   { label: 'Calendar', to: '/calendar' },
   { label: 'Recipes', to: '/recipes' },
@@ -38,6 +46,9 @@ const Header = () => {
   const location = useLocation();
   const [dark, setDark] = useTheme();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const payload = getTokenPayload();
+  const isAdmin = payload?.role === 'admin';
+  const tabs = isAdmin ? [...baseTabs, { label: 'Admin', to: '/admin' }] : baseTabs;
 
   // Close mobile menu on route change
   useEffect(() => {

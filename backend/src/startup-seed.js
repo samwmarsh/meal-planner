@@ -46,6 +46,10 @@ async function ensureTables() {
       ingredient_refs JSONB DEFAULT '[]'
     )
   `);
+  // Add image_url to recipes if it doesn't exist (safe migration for existing volumes)
+  await db.query(`
+    ALTER TABLE recipes ADD COLUMN IF NOT EXISTS image_url TEXT
+  `);
   // Add dietary_requirement to user_profiles if it doesn't exist (safe migration for existing volumes)
   await db.query(`
     ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS dietary_requirement VARCHAR(50)
@@ -99,6 +103,10 @@ async function ensureTables() {
   // Add strava_activity_id to workout_logs for dedup
   await db.query(`
     ALTER TABLE workout_logs ADD COLUMN IF NOT EXISTS strava_activity_id BIGINT
+  `);
+  // Add role column to users if missing
+  await db.query(`
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(20) DEFAULT 'user'
   `);
   // Workout tracking tables
   await db.query(`
@@ -228,6 +236,8 @@ async function runStartupSeed() {
     await ensureTables();
     await seedRecipes();
     await seedExercises();
+    // Ensure sam is admin
+    await db.query(`UPDATE users SET role = 'admin' WHERE username = 'sam' AND (role IS NULL OR role = 'user')`);
     console.log('[startup-seed] Done.');
   } catch (err) {
     console.error('[startup-seed] Error:', err.message);

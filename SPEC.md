@@ -28,7 +28,7 @@ A personal meal planning and health tracking app. Users plan their weekly meals 
 - [x] Register (username + password)
 - [x] Login / JWT auth
 - [x] Logout (clear token client-side)
-- [ ] Persistent login ("remember me" — 30-day token)
+- [x] Persistent login ("remember me" — 30-day token)
 - [ ] Change password
 - [ ] Delete account
 
@@ -282,9 +282,9 @@ CREATE TABLE shopping_trip_items (
 43. ✅ **Method step scaling** — ingredient quantities in recipe steps scale with servings adjuster
 44. ✅ **Weekly macro pie chart** — donut chart on Progress page showing protein/carbs/fat split
 45. ✅ **Calorie target line** — plotted dashed target line on calorie intake chart
-46. **Admin approval queue** — community recipe submissions with approval workflow
-47. **Recipe photos** — image upload/URL for recipe cards and detail view
-48. **Persistent login** — "remember me" option with 30-day token
+46. ✅ **Admin approval queue** — community recipe submissions with approval workflow
+47. ✅ **Recipe photos** — image URL for recipe cards and detail view, auto-extracted from schema.org on import
+48. ✅ **Persistent login** — "remember me" option with 30-day token
 
 ---
 
