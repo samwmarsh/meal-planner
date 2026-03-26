@@ -78,9 +78,9 @@ const Header = () => {
           Meal Planner
         </span>
 
-        {/* Tabs — desktop only (md+) */}
+        {/* Tabs — desktop only (lg+, hamburger below 1024px) */}
         {token && (
-          <nav className="hidden md:block flex-1 overflow-x-auto mx-4 scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+          <nav className="hidden lg:block flex-1 overflow-x-auto mx-4 scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
             <ul className="flex items-center gap-1 min-w-max h-14">
               {tabs.map(({ label, to }) => (
                 <li key={to}>
@@ -89,7 +89,7 @@ const Header = () => {
                     end={to === '/'}
                     className={({ isActive }) =>
                       [
-                        'inline-flex items-center px-4 h-14 text-sm font-medium border-b-2 transition-colors whitespace-nowrap',
+                        'inline-flex items-center px-3 h-14 text-sm font-medium border-b-2 transition-colors whitespace-nowrap',
                         isActive
                           ? 'border-blue-600 text-blue-600 dark:text-blue-400 dark:border-blue-400'
                           : 'border-transparent text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 hover:border-blue-300',
@@ -130,7 +130,7 @@ const Header = () => {
               <NavLink
                 to="/profile"
                 className={({ isActive }) =>
-                  `hidden md:inline text-sm font-medium transition-colors ${
+                  `hidden lg:inline text-sm font-medium transition-colors ${
                     isActive ? 'text-blue-600 dark:text-blue-400' : 'text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400'
                   }`
                 }
@@ -146,7 +146,7 @@ const Header = () => {
               {/* Hamburger — mobile only */}
               <button
                 onClick={() => setMobileMenuOpen(prev => !prev)}
-                className="md:hidden p-1.5 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                className="lg:hidden p-1.5 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
                 aria-label="Toggle menu"
               >
                 {mobileMenuOpen ? (
@@ -181,7 +181,7 @@ const Header = () => {
 
       {/* Mobile slide-down menu */}
       {token && mobileMenuOpen && (
-        <nav className="md:hidden border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-lg">
+        <nav className="lg:hidden border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-lg">
           <ul className="flex flex-col py-2">
             {tabs.map(({ label, to }) => (
               <li key={to}>
