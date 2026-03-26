@@ -1,35 +1,35 @@
-import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import API_BASE_URL from '../config';
 
 const Login = () => {
-  const navigate = useNavigate();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [remember, setRemember] = useState(false);
   const [error, setError] = useState('');
 
-  // Clear any stale/expired token when landing on login page
-  useEffect(() => {
-    localStorage.removeItem('token');
-  }, []);
-
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const response = await fetch(`${API_BASE_URL}/auth/login`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ username, password, remember }),
-    });
+    setError('');
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ username, password, remember }),
+      });
 
-    if (response.ok) {
-      const data = await response.json();
-      localStorage.setItem('token', data.token);
-      navigate('/');
-    } else {
-      setError('Invalid credentials');
+      if (response.ok) {
+        const data = await response.json();
+        localStorage.setItem('token', data.token);
+        // Full page reload ensures Header and route guards re-read the token
+        window.location.href = '/';
+      } else {
+        setError('Invalid credentials');
+      }
+    } catch {
+      setError('Network error. Please try again.');
     }
   };
 
