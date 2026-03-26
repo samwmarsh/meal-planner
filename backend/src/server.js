@@ -761,7 +761,7 @@ app.patch('/recipes/:id', authenticateToken, async (req, res) => {
       return res.status(403).json({ error: 'You can only edit your own recipes' });
     }
     const { title, category, description, servings, prep_time_mins, cook_time_mins,
-            calories_per_serving, protein_per_serving, carbs_per_serving, fat_per_serving, image_url } = req.body;
+            calories_per_serving, protein_per_serving, carbs_per_serving, fat_per_serving, image_url, dietary_tags } = req.body;
     const { rows } = await db.query(
       `UPDATE recipes SET
          title                = COALESCE($1, title),
@@ -775,13 +775,15 @@ app.patch('/recipes/:id', authenticateToken, async (req, res) => {
          carbs_per_serving    = COALESCE($9, carbs_per_serving),
          fat_per_serving      = COALESCE($10, fat_per_serving),
          image_url            = COALESCE($11, image_url),
+         dietary_tags         = COALESCE($12, dietary_tags),
          updated_at           = NOW()
-       WHERE id = $12
+       WHERE id = $13
        RETURNING *`,
       [title ?? null, category ?? null, description ?? null,
        servings ?? null, prep_time_mins ?? null, cook_time_mins ?? null,
        calories_per_serving ?? null, protein_per_serving ?? null,
-       carbs_per_serving ?? null, fat_per_serving ?? null, image_url ?? null, id]
+       carbs_per_serving ?? null, fat_per_serving ?? null, image_url ?? null,
+       dietary_tags ?? null, id]
     );
     if (rows.length === 0) return res.status(404).json({ error: 'Recipe not found' });
     res.json(rows[0]);
@@ -1292,6 +1294,45 @@ app.post('/recipes/:id/reparse-steps', authenticateToken, async (req, res) => {
     res.json({ steps });
   } catch (err) {
     res.status(500).json({ error: 'Failed to reparse steps', details: err.message });
+  }
+});
+
+// Admin: bulk reparse all recipe ingredients with improved parser
+app.post('/admin/reparse-ingredients', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { rows: ingredients } = await db.query(
+      `SELECT ri.id, ri.quantity, ri.unit, ri.name, ri.notes,
+              CONCAT_WS(' ', ri.quantity, ri.unit, ri.name) AS original_text
+       FROM recipe_ingredients ri
+       ORDER BY ri.id`
+    );
+    let updated = 0;
+    for (const ing of ingredients) {
+      // Reconstruct the original ingredient string and re-parse it
+      const parts = [];
+      if (ing.quantity) parts.push(String(ing.quantity));
+      if (ing.unit) parts.push(ing.unit);
+      parts.push(ing.name);
+      if (ing.notes) parts.push(ing.notes);
+      const raw = parts.join(' ');
+      const parsed = parseIngredient(raw);
+      // Only update if parsing produced different results
+      if (parsed.quantity !== parseFloat(ing.quantity) || parsed.unit !== ing.unit || parsed.name !== ing.name) {
+        await db.query(
+          `UPDATE recipe_ingredients SET quantity = $1, unit = $2, name = $3, notes = COALESCE(NULLIF($4, ''), notes) WHERE id = $5`,
+          [parsed.quantity, parsed.unit, parsed.name, parsed.notes || '', ing.id]
+        );
+        updated++;
+      }
+    }
+    // Also reparse step ingredient refs for all recipes
+    const { rows: recipes } = await db.query('SELECT id FROM recipes');
+    for (const r of recipes) {
+      await reparsStepIngredients(r.id);
+    }
+    res.json({ message: `Reparsed ${updated} ingredients across ${recipes.length} recipes` });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to reparse ingredients', details: err.message });
   }
 });
 

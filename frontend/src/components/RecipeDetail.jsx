@@ -195,6 +195,8 @@ const AddToPlanModal = ({ recipe, onClose, onConfirm, servings }) => {
 
 // ── Edit Recipe Modal ─────────────────────────────────────────────────────────
 
+const ALL_DIETARY_TAGS = ['vegan', 'vegetarian', 'gluten-free', 'dairy-free', 'keto', 'paleo', 'pcos-friendly', 'low-glycemic', 'high-protein', 'low-carb'];
+
 const EditRecipeModal = ({ recipe, onClose, onSaved }) => {
   const [form, setForm] = useState({
     title:                recipe.title || '',
@@ -209,6 +211,8 @@ const EditRecipeModal = ({ recipe, onClose, onSaved }) => {
     fat_per_serving:      recipe.fat_per_serving || 0,
     image_url:            recipe.image_url || '',
   });
+  const [selectedTags, setSelectedTags] = useState(recipe.dietary_tags || []);
+  const toggleTag = (tag) => setSelectedTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -233,6 +237,7 @@ const EditRecipeModal = ({ recipe, onClose, onSaved }) => {
           carbs_per_serving:    parseFloat(form.carbs_per_serving) || 0,
           fat_per_serving:      parseFloat(form.fat_per_serving) || 0,
           image_url:            form.image_url.trim() || null,
+          dietary_tags:         selectedTags,
         }),
       });
       if (!res.ok) { const d = await res.json(); throw new Error(d.error || 'Failed to save'); }
@@ -295,6 +300,22 @@ const EditRecipeModal = ({ recipe, onClose, onSaved }) => {
           <div>
             <label className={labelCls}>Image URL</label>
             <input name="image_url" value={form.image_url} onChange={handleChange} placeholder="https://example.com/photo.jpg" className={inputCls} />
+          </div>
+
+          <div>
+            <label className={labelCls}>Dietary Tags</label>
+            <div className="flex flex-wrap gap-1.5">
+              {ALL_DIETARY_TAGS.map(tag => (
+                <button key={tag} type="button" onClick={() => toggleTag(tag)}
+                  className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+                    selectedTags.includes(tag)
+                      ? 'bg-teal-600 text-white'
+                      : 'bg-slate-100 text-slate-500 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-400'
+                  }`}>
+                  {tag}
+                </button>
+              ))}
+            </div>
           </div>
 
           <div>
