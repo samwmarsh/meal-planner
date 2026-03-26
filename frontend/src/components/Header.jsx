@@ -79,7 +79,7 @@ const Header = () => {
 
         {/* Tabs — desktop only (md+) */}
         {token && (
-          <nav className="hidden md:block flex-1 overflow-x-auto mx-4">
+          <nav className="hidden md:block flex-1 overflow-x-auto mx-4 scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
             <ul className="flex items-center gap-1 min-w-max h-14">
               {tabs.map(({ label, to }) => (
                 <li key={to}>

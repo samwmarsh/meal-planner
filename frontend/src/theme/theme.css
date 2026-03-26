@@ -3,6 +3,11 @@
 /* Enable class-based dark mode for Tailwind v4 */
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* Hide scrollbar on nav tabs while keeping scroll */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
 /* FullCalendar overrides */
 .fc {
   background: #fff;
