@@ -4,7 +4,16 @@ cd /home/ec2-user/meal-planner
 
 echo "[deploy] Running after-install checks..."
 
-# Ensure .env exists (created manually during EC2 setup, never in git)
+# Make all deploy scripts executable (git doesn't always preserve +x via CodeDeploy)
+chmod +x /home/ec2-user/meal-planner/scripts/deploy/*.sh
+
+# Restore .env from backup (CodeDeploy overwrites the directory)
+if [ ! -f .env ] && [ -f /home/ec2-user/.env.deploy-backup ]; then
+  cp /home/ec2-user/.env.deploy-backup .env
+  echo "[deploy] Restored .env from backup"
+fi
+
+# Ensure .env exists
 if [ ! -f .env ]; then
   echo "ERROR: .env file not found at /home/ec2-user/meal-planner/.env"
   echo "Create it from .env.example before deploying."

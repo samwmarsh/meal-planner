@@ -9,15 +9,36 @@ const JWT_SECRET = process.env.JWT_SECRET;
 
 router.post('/register', async (req, res) => {
   const { username, password } = req.body;
+  if (!username || !password) {
+    return res.status(400).json({ error: 'Username and password are required.' });
+  }
+  if (username.length < 3) {
+    return res.status(400).json({ error: 'Username must be at least 3 characters.' });
+  }
+  if (password.length < 8) {
+    return res.status(400).json({ error: 'Password must be at least 8 characters.' });
+  }
+  if (!/[A-Z]/.test(password)) {
+    return res.status(400).json({ error: 'Password must contain at least one uppercase letter.' });
+  }
+  if (!/[a-z]/.test(password)) {
+    return res.status(400).json({ error: 'Password must contain at least one lowercase letter.' });
+  }
+  if (!/[0-9]/.test(password)) {
+    return res.status(400).json({ error: 'Password must contain at least one number.' });
+  }
   try {
     const hashedPassword = await bcrypt.hash(password, 10);
     await db.query(
       'INSERT INTO users (username, password_hash) VALUES ($1, $2)',
       [username, hashedPassword]
     );
-    res.status(201).send('User registered');
+    res.status(201).json({ message: 'User registered' });
   } catch (err) {
-    res.status(500).send('Error registering user');
+    if (err.code === '23505') {
+      return res.status(409).json({ error: 'Username already taken.' });
+    }
+    res.status(500).json({ error: 'Error registering user.' });
   }
 });
 
@@ -46,8 +67,8 @@ router.put('/change-password', authenticateToken, async (req, res) => {
   if (!current_password || !new_password) {
     return res.status(400).json({ error: 'Current password and new password are required.' });
   }
-  if (new_password.length < 6) {
-    return res.status(400).json({ error: 'New password must be at least 6 characters.' });
+  if (new_password.length < 8 || !/[A-Z]/.test(new_password) || !/[a-z]/.test(new_password) || !/[0-9]/.test(new_password)) {
+    return res.status(400).json({ error: 'Password must be at least 8 characters with uppercase, lowercase, and a number.' });
   }
   try {
     const result = await db.query('SELECT * FROM users WHERE id = $1', [req.user.id]);

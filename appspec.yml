@@ -12,6 +12,10 @@ hooks:
     - location: scripts/deploy/stop.sh
       timeout: 60
       runas: ec2-user
+  BeforeInstall:
+    - location: scripts/deploy/before-install.sh
+      timeout: 60
+      runas: ec2-user
   AfterInstall:
     - location: scripts/deploy/after-install.sh
       timeout: 300

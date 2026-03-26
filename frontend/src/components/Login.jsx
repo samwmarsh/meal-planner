@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import API_BASE_URL from '../config';
 
@@ -8,6 +8,11 @@ const Login = () => {
   const [password, setPassword] = useState('');
   const [remember, setRemember] = useState(false);
   const [error, setError] = useState('');
+
+  // Clear any stale/expired token when landing on login page
+  useEffect(() => {
+    localStorage.removeItem('token');
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();

@@ -40,13 +40,22 @@ function useTheme() {
   return [dark, setDark];
 }
 
-const Header = () => {
+function isTokenValid() {
   const token = localStorage.getItem('token');
+  if (!token) return false;
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    return !payload.exp || payload.exp * 1000 > Date.now();
+  } catch { return false; }
+}
+
+const Header = () => {
+  const token = isTokenValid() ? localStorage.getItem('token') : null;
   const navigate = useNavigate();
   const location = useLocation();
   const [dark, setDark] = useTheme();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const payload = getTokenPayload();
+  const payload = token ? getTokenPayload() : null;
   const isAdmin = payload?.role === 'admin';
   const tabs = isAdmin ? [...baseTabs, { label: 'Admin', to: '/admin' }] : baseTabs;
 
