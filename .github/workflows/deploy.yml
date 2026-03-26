@@ -28,11 +28,12 @@ jobs:
 
       - name: Trigger CodeDeploy deployment
         run: |
+          DESC="Deploy ${GITHUB_SHA::7}"
           DEPLOYMENT_ID=$(aws deploy create-deployment \
             --application-name meal-planner \
             --deployment-group-name meal-planner-ec2 \
             --github-location repository=${{ github.repository }},commitId=${{ github.sha }} \
-            --description "Deploy ${{ github.sha }} — ${{ github.event.head_commit.message }}" \
+            --description "$DESC" \
             --query 'deploymentId' \
             --output text)
           echo "Deployment started: $DEPLOYMENT_ID"
