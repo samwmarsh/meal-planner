@@ -17,6 +17,7 @@ import ProgressCharts from './components/ProgressCharts';
 import WorkoutLog from './components/WorkoutLog';
 import Header from './components/Header';
 import AdminQueue from './components/AdminQueue';
+import ExportData from './components/ExportData';
 import { ToastProvider } from './components/ToastContext';
 
 const isAuthenticated = () => {
@@ -54,6 +55,7 @@ function App() {
           <Route path="/log" element={isAuthenticated() ? <DailyLog /> : <Navigate to="/login" />} />
           <Route path="/workouts" element={isAuthenticated() ? <WorkoutLog /> : <Navigate to="/login" />} />
           <Route path="/progress" element={isAuthenticated() ? <ProgressCharts /> : <Navigate to="/login" />} />
+          <Route path="/export" element={isAuthenticated() ? <ExportData /> : <Navigate to="/login" />} />
           <Route path="/admin" element={isAuthenticated() ? <AdminQueue /> : <Navigate to="/login" />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />

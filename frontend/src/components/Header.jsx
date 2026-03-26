@@ -18,6 +18,7 @@ const baseTabs = [
   { label: 'Goals', to: '/goals' },
   { label: 'Log', to: '/log' },
   { label: 'Progress', to: '/progress' },
+  { label: 'Export', to: '/export' },
 ];
 
 function useTheme() {

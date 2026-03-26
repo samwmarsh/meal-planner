@@ -1776,6 +1776,250 @@ app.put('/admin/recipes/:id/reject', authenticateToken, requireAdmin, async (req
   }
 });
 
+// ── Data Export (CSV) ────────────────────────────────────────────────────────
+
+// CSV helper — escapes fields and joins into a CSV row
+function csvEscape(val) {
+  if (val == null) return '';
+  const s = String(val);
+  if (s.includes(',') || s.includes('"') || s.includes('\n')) {
+    return '"' + s.replace(/"/g, '""') + '"';
+  }
+  return s;
+}
+function csvRow(fields) { return fields.map(csvEscape).join(',') + '\n'; }
+
+function setCsvHeaders(res, filename) {
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+}
+
+// Export meal plans
+app.get('/export/meal-plans', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const from = req.query.from || new Date(Date.now() - 90 * 86400000).toISOString().slice(0, 10);
+    const to = req.query.to || new Date().toISOString().slice(0, 10);
+    const { rows } = await db.query(
+      `SELECT mp.date, mp.meal_type, COALESCE(m.name, r.title) AS meal_name, mp.servings,
+              ROUND(COALESCE(m.calories, r.calories_per_serving) * mp.servings) AS calories,
+              ROUND(COALESCE(m.protein_g, r.protein_per_serving) * mp.servings, 1) AS protein_g,
+              ROUND(COALESCE(m.carbs_g, r.carbs_per_serving) * mp.servings, 1) AS carbs_g,
+              ROUND(COALESCE(m.fat_g, r.fat_per_serving) * mp.servings, 1) AS fat_g
+       FROM meal_plans mp
+       LEFT JOIN meals m ON mp.meal_id = m.id
+       LEFT JOIN recipes r ON mp.recipe_id = r.id
+       WHERE mp.user_id = $1 AND mp.date BETWEEN $2 AND $3
+       ORDER BY mp.date, mp.meal_type`,
+      [userId, from, to]
+    );
+    setCsvHeaders(res, `meal-plans-${from}-to-${to}.csv`);
+    res.write(csvRow(['Date', 'Meal Type', 'Meal Name', 'Servings', 'Calories', 'Protein (g)', 'Carbs (g)', 'Fat (g)']));
+    for (const r of rows) {
+      const d = typeof r.date === 'string' ? r.date.slice(0, 10) : r.date.toISOString().slice(0, 10);
+      res.write(csvRow([d, r.meal_type, r.meal_name, r.servings, r.calories, r.protein_g, r.carbs_g, r.fat_g]));
+    }
+    res.end();
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to export meal plans', details: err.message });
+  }
+});
+
+// Export recipes
+app.get('/export/recipes', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { rows } = await db.query(
+      `SELECT title, category, servings, prep_time_mins, cook_time_mins,
+              calories_per_serving, protein_per_serving, carbs_per_serving, fat_per_serving,
+              dietary_tags, source_url, status, created_at
+       FROM recipes WHERE author_id = $1 ORDER BY created_at DESC`,
+      [userId]
+    );
+    setCsvHeaders(res, 'recipes.csv');
+    res.write(csvRow(['Title', 'Category', 'Servings', 'Prep Time (min)', 'Cook Time (min)',
+      'Calories/Serving', 'Protein/Serving', 'Carbs/Serving', 'Fat/Serving', 'Dietary Tags', 'Source URL', 'Status', 'Created']));
+    for (const r of rows) {
+      const d = r.created_at ? r.created_at.toISOString().slice(0, 10) : '';
+      res.write(csvRow([r.title, r.category, r.servings, r.prep_time_mins, r.cook_time_mins,
+        r.calories_per_serving, r.protein_per_serving, r.carbs_per_serving, r.fat_per_serving,
+        (r.dietary_tags || []).join('; '), r.source_url, r.status, d]));
+    }
+    res.end();
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to export recipes', details: err.message });
+  }
+});
+
+// Export recipe ingredients
+app.get('/export/recipes/ingredients', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { rows } = await db.query(
+      `SELECT r.title AS recipe_title, ri.section, ri.position, ri.quantity, ri.unit, ri.name, ri.notes
+       FROM recipe_ingredients ri
+       JOIN recipes r ON r.id = ri.recipe_id
+       WHERE r.author_id = $1
+       ORDER BY r.title, ri.section, ri.position`,
+      [userId]
+    );
+    setCsvHeaders(res, 'recipe-ingredients.csv');
+    res.write(csvRow(['Recipe Title', 'Section', 'Position', 'Quantity', 'Unit', 'Ingredient Name', 'Notes']));
+    for (const r of rows) {
+      res.write(csvRow([r.recipe_title, r.section, r.position, r.quantity, r.unit, r.name, r.notes]));
+    }
+    res.end();
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to export ingredients', details: err.message });
+  }
+});
+
+// Export daily logs
+app.get('/export/daily-logs', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    let query = 'SELECT date, weight_kg, sleep_hours, sleep_quality, water_ml, steps, notes FROM daily_logs WHERE user_id = $1';
+    const params = [userId];
+    if (req.query.from) { params.push(req.query.from); query += ` AND date >= $${params.length}`; }
+    if (req.query.to) { params.push(req.query.to); query += ` AND date <= $${params.length}`; }
+    query += ' ORDER BY date DESC';
+    const { rows } = await db.query(query, params);
+    setCsvHeaders(res, 'daily-logs.csv');
+    res.write(csvRow(['Date', 'Weight (kg)', 'Sleep (hours)', 'Sleep Quality (1-5)', 'Water (ml)', 'Steps', 'Notes']));
+    for (const r of rows) {
+      const d = typeof r.date === 'string' ? r.date.slice(0, 10) : r.date.toISOString().slice(0, 10);
+      res.write(csvRow([d, r.weight_kg, r.sleep_hours, r.sleep_quality, r.water_ml, r.steps, r.notes]));
+    }
+    res.end();
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to export daily logs', details: err.message });
+  }
+});
+
+// Export workouts
+app.get('/export/workouts', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    let query = `SELECT wl.date, wl.name AS workout_name, e.name AS exercise_name,
+                        ws.set_number, ws.reps, ws.weight_kg, ws.duration_secs, ws.distance_m, wl.notes
+                 FROM workout_logs wl
+                 LEFT JOIN workout_sets ws ON ws.workout_log_id = wl.id
+                 LEFT JOIN exercises e ON e.id = ws.exercise_id
+                 WHERE wl.user_id = $1`;
+    const params = [userId];
+    if (req.query.from) { params.push(req.query.from); query += ` AND wl.date >= $${params.length}`; }
+    if (req.query.to) { params.push(req.query.to); query += ` AND wl.date <= $${params.length}`; }
+    query += ' ORDER BY wl.date DESC, wl.id, ws.set_number';
+    const { rows } = await db.query(query, params);
+    setCsvHeaders(res, 'workouts.csv');
+    res.write(csvRow(['Date', 'Workout Name', 'Exercise', 'Set', 'Reps', 'Weight (kg)', 'Duration (secs)', 'Distance (m)', 'Notes']));
+    for (const r of rows) {
+      const d = typeof r.date === 'string' ? r.date.slice(0, 10) : r.date.toISOString().slice(0, 10);
+      res.write(csvRow([d, r.workout_name, r.exercise_name, r.set_number, r.reps, r.weight_kg, r.duration_secs, r.distance_m, r.notes]));
+    }
+    res.end();
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to export workouts', details: err.message });
+  }
+});
+
+// Export all data as zip
+app.get('/export/all', authenticateToken, async (req, res) => {
+  try {
+    const archiver = require('archiver');
+    const userId = req.user.id;
+    const today = new Date().toISOString().slice(0, 10);
+
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename="meal-planner-export-${today}.zip"`);
+
+    const archive = archiver('zip', { zlib: { level: 9 } });
+    archive.pipe(res);
+
+    // Helper to build CSV string
+    const buildCsv = (headers, rows, rowFn) => {
+      let csv = csvRow(headers);
+      for (const r of rows) csv += csvRow(rowFn(r));
+      return csv;
+    };
+
+    // Meal plans (last year)
+    const from = new Date(Date.now() - 365 * 86400000).toISOString().slice(0, 10);
+    const { rows: mealRows } = await db.query(
+      `SELECT mp.date, mp.meal_type, COALESCE(m.name, r.title) AS meal_name, mp.servings,
+              ROUND(COALESCE(m.calories, r.calories_per_serving) * mp.servings) AS calories,
+              ROUND(COALESCE(m.protein_g, r.protein_per_serving) * mp.servings, 1) AS protein_g,
+              ROUND(COALESCE(m.carbs_g, r.carbs_per_serving) * mp.servings, 1) AS carbs_g,
+              ROUND(COALESCE(m.fat_g, r.fat_per_serving) * mp.servings, 1) AS fat_g
+       FROM meal_plans mp LEFT JOIN meals m ON mp.meal_id = m.id LEFT JOIN recipes r ON mp.recipe_id = r.id
+       WHERE mp.user_id = $1 AND mp.date >= $2 ORDER BY mp.date, mp.meal_type`,
+      [userId, from]
+    );
+    archive.append(buildCsv(
+      ['Date', 'Meal Type', 'Meal Name', 'Servings', 'Calories', 'Protein (g)', 'Carbs (g)', 'Fat (g)'],
+      mealRows, r => {
+        const d = typeof r.date === 'string' ? r.date.slice(0, 10) : r.date.toISOString().slice(0, 10);
+        return [d, r.meal_type, r.meal_name, r.servings, r.calories, r.protein_g, r.carbs_g, r.fat_g];
+      }
+    ), { name: 'meal-plans.csv' });
+
+    // Recipes
+    const { rows: recipeRows } = await db.query(
+      `SELECT title, category, servings, prep_time_mins, cook_time_mins, calories_per_serving,
+              protein_per_serving, carbs_per_serving, fat_per_serving, dietary_tags, source_url, status, created_at
+       FROM recipes WHERE author_id = $1 ORDER BY created_at DESC`, [userId]
+    );
+    archive.append(buildCsv(
+      ['Title', 'Category', 'Servings', 'Prep Time (min)', 'Cook Time (min)', 'Calories/Serving', 'Protein/Serving', 'Carbs/Serving', 'Fat/Serving', 'Dietary Tags', 'Source URL', 'Status', 'Created'],
+      recipeRows, r => [r.title, r.category, r.servings, r.prep_time_mins, r.cook_time_mins, r.calories_per_serving, r.protein_per_serving, r.carbs_per_serving, r.fat_per_serving, (r.dietary_tags || []).join('; '), r.source_url, r.status, r.created_at ? r.created_at.toISOString().slice(0, 10) : '']
+    ), { name: 'recipes.csv' });
+
+    // Recipe ingredients
+    const { rows: ingRows } = await db.query(
+      `SELECT r.title AS recipe_title, ri.section, ri.position, ri.quantity, ri.unit, ri.name, ri.notes
+       FROM recipe_ingredients ri JOIN recipes r ON r.id = ri.recipe_id WHERE r.author_id = $1
+       ORDER BY r.title, ri.section, ri.position`, [userId]
+    );
+    archive.append(buildCsv(
+      ['Recipe Title', 'Section', 'Position', 'Quantity', 'Unit', 'Ingredient Name', 'Notes'],
+      ingRows, r => [r.recipe_title, r.section, r.position, r.quantity, r.unit, r.name, r.notes]
+    ), { name: 'recipe-ingredients.csv' });
+
+    // Daily logs
+    const { rows: logRows } = await db.query(
+      'SELECT date, weight_kg, sleep_hours, sleep_quality, water_ml, steps, notes FROM daily_logs WHERE user_id = $1 ORDER BY date DESC', [userId]
+    );
+    archive.append(buildCsv(
+      ['Date', 'Weight (kg)', 'Sleep (hours)', 'Sleep Quality (1-5)', 'Water (ml)', 'Steps', 'Notes'],
+      logRows, r => {
+        const d = typeof r.date === 'string' ? r.date.slice(0, 10) : r.date.toISOString().slice(0, 10);
+        return [d, r.weight_kg, r.sleep_hours, r.sleep_quality, r.water_ml, r.steps, r.notes];
+      }
+    ), { name: 'daily-logs.csv' });
+
+    // Workouts
+    const { rows: workoutRows } = await db.query(
+      `SELECT wl.date, wl.name AS workout_name, e.name AS exercise_name,
+              ws.set_number, ws.reps, ws.weight_kg, ws.duration_secs, ws.distance_m, wl.notes
+       FROM workout_logs wl LEFT JOIN workout_sets ws ON ws.workout_log_id = wl.id
+       LEFT JOIN exercises e ON e.id = ws.exercise_id
+       WHERE wl.user_id = $1 ORDER BY wl.date DESC, wl.id, ws.set_number`, [userId]
+    );
+    archive.append(buildCsv(
+      ['Date', 'Workout Name', 'Exercise', 'Set', 'Reps', 'Weight (kg)', 'Duration (secs)', 'Distance (m)', 'Notes'],
+      workoutRows, r => {
+        const d = typeof r.date === 'string' ? r.date.slice(0, 10) : r.date.toISOString().slice(0, 10);
+        return [d, r.workout_name, r.exercise_name, r.set_number, r.reps, r.weight_kg, r.duration_secs, r.distance_m, r.notes];
+      }
+    ), { name: 'workouts.csv' });
+
+    await archive.finalize();
+  } catch (err) {
+    console.error('[export] Zip error:', err.message);
+    if (!res.headersSent) res.status(500).json({ error: 'Failed to export data', details: err.message });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`Server listening on port ${PORT}`);
 });
