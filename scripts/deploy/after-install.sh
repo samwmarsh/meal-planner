@@ -4,9 +4,6 @@ cd /home/ec2-user/meal-planner
 
 echo "[deploy] Running after-install checks..."
 
-# Make all deploy scripts executable (git doesn't always preserve +x via CodeDeploy)
-chmod +x /home/ec2-user/meal-planner/scripts/deploy/*.sh
-
 # Restore .env from backup (CodeDeploy overwrites the directory)
 if [ ! -f .env ] && [ -f /home/ec2-user/.env.deploy-backup ]; then
   cp /home/ec2-user/.env.deploy-backup .env
